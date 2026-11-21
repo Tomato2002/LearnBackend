@@ -1,0 +1,43 @@
+@HostAddress = http://localhost:5098
+
+### 1. Xem danh sách các loại quái vật trong game (Do Server cấu hình)
+GET {{HostAddress}}/api/players/monsters
+Accept: application/json
+
+### 2. Xem thông tin ban đầu của Arthur (Đang Level 1, Exp: 20, Gold: 150)
+GET {{HostAddress}}/api/players/1
+Accept: application/json
+
+### 3. [TEST BẢO MẬT] Arthur Level 1 cố tình gian lận đòi đánh Boss Rồng Lửa (Yêu cầu Level 5)
+# Kết quả mong đợi: Server trả về lỗi 400 Bad Request cảnh báo gian lận!
+POST {{HostAddress}}/api/players/1/defeat-monster
+Content-Type: application/json
+
+{
+  "monsterId": 3
+}
+
+### 4. Arthur đánh Goblin (Quái ID = 1, yêu cầu Level 1)
+# Kết quả: Được Server cộng 40 Exp và 15 Vàng (Exp: 20 + 40 = 60/100)
+POST {{HostAddress}}/api/players/1/defeat-monster
+Content-Type: application/json
+
+{
+  "monsterId": 1
+}
+
+### 5. Arthur đánh tiếp 1 con Goblin nữa -> Đủ 100 Exp -> TỰ ĐỘNG LÊN LEVEL 2!
+POST {{HostAddress}}/api/players/1/defeat-monster
+Content-Type: application/json
+
+{
+  "monsterId": 1
+}
+
+### 6. Khi đã lên Level 2, Arthur đủ điều kiện khiêu chiến Sói Rừng (Quái ID = 2)
+POST {{HostAddress}}/api/players/1/defeat-monster
+Content-Type: application/json
+
+{
+  "monsterId": 2
+}
