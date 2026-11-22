@@ -1,0 +1,35 @@
+[
+  {
+    "id": "daily_battle_2",
+    "title": "Chiến Binh Chăm Chỉ",
+    "description": "Đánh thắng 2 trận Chiến Dịch trong ngày.",
+    "eventType": "StageCleared",
+    "targetCount": 2,
+    "rewardGold": 300,
+    "rewardGems": 100,
+    "rewardItemId": "potion_exp_small",
+    "rewardItemQty": 2
+  },
+  {
+    "id": "daily_gacha_1",
+    "title": "Lời Gọi Tinh Tú",
+    "description": "Thực hiện triệu hồi Gacha ít nhất 1 lần.",
+    "eventType": "GachaSummoned",
+    "targetCount": 1,
+    "rewardGold": 200,
+    "rewardGems": 50,
+    "rewardItemId": "stone_enhance",
+    "rewardItemQty": 2
+  },
+  {
+    "id": "daily_shop_1",
+    "title": "Khách Hàng Thân Thiết",
+    "description": "Mua 1 vật phẩm bất kỳ trong Cửa Hàng.",
+    "eventType": "ShopPurchased",
+    "targetCount": 1,
+    "rewardGold": 250,
+    "rewardGems": 50,
+    "rewardItemId": "potion_exp_small",
+    "rewardItemQty": 3
+  }
+]

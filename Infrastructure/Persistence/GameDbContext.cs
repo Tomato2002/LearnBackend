@@ -1,7 +1,11 @@
 using LearnBackend.Modules.Auth.Entities;
+using LearnBackend.Modules.Gacha.Entities;
 using LearnBackend.Modules.Hero.Entities;
 using LearnBackend.Modules.Inventory.Entities;
+using LearnBackend.Modules.Mail.Entities;
 using LearnBackend.Modules.Player.Entities;
+using LearnBackend.Modules.Quest.Entities;
+using LearnBackend.Modules.Shop.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace LearnBackend.Infrastructure.Persistence;
@@ -15,6 +19,14 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<PlayerHero> PlayerHeroes => Set<PlayerHero>();
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<EquipmentInstance> Equipments => Set<EquipmentInstance>();
+
+    // Stage 3 Meta Tables
+    public DbSet<PlayerGachaPity> PlayerGachaPities => Set<PlayerGachaPity>();
+    public DbSet<GachaHistory> GachaHistories => Set<GachaHistory>();
+    public DbSet<PlayerShopPurchase> PlayerShopPurchases => Set<PlayerShopPurchase>();
+    public DbSet<PlayerQuestProgress> PlayerQuestProgresses => Set<PlayerQuestProgress>();
+    public DbSet<GlobalMail> GlobalMails => Set<GlobalMail>();
+    public DbSet<PlayerGlobalMailClaim> PlayerGlobalMailClaims => Set<PlayerGlobalMailClaim>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +87,51 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             entity.Property(x => x.TemplateId).HasMaxLength(64).IsRequired();
             entity.HasIndex(x => x.PlayerId);
             entity.HasIndex(x => x.EquippedHeroId);
+        });
+
+        modelBuilder.Entity<PlayerGachaPity>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.BannerId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => new { x.PlayerId, x.BannerId }).IsUnique();
+        });
+
+        modelBuilder.Entity<GachaHistory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.BannerId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.HeroTemplateId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => new { x.PlayerId, x.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<PlayerShopPurchase>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ShopItemId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PeriodKey).HasMaxLength(16).IsRequired();
+            entity.HasIndex(x => new { x.PlayerId, x.ShopItemId, x.PeriodKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<PlayerQuestProgress>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.QuestId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PeriodKey).HasMaxLength(16).IsRequired();
+            entity.HasIndex(x => new { x.PlayerId, x.QuestId, x.PeriodKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<GlobalMail>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Body).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.RewardItemId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<PlayerGlobalMailClaim>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.PlayerId, x.GlobalMailId }).IsUnique();
         });
     }
 }

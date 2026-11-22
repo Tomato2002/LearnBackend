@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using LearnBackend.Common.DTOs;
+using LearnBackend.Common.Events;
 using LearnBackend.Common.Idempotency;
 using LearnBackend.Common.Locking;
 using LearnBackend.Common.Middleware;
@@ -11,14 +12,17 @@ using LearnBackend.Infrastructure.Security;
 using LearnBackend.Modules.Auth;
 using LearnBackend.Modules.Battle;
 using LearnBackend.Modules.Battle.Engine;
+using LearnBackend.Modules.Gacha;
 using LearnBackend.Modules.Hero;
 using LearnBackend.Modules.Inventory;
+using LearnBackend.Modules.Mail;
+using LearnBackend.Modules.Mail.Entities;
 using LearnBackend.Modules.MasterData;
 using LearnBackend.Modules.Player;
+using LearnBackend.Modules.Quest;
+using LearnBackend.Modules.Shop;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
@@ -71,7 +75,6 @@ builder.Services.AddRateLimiter(options =>
         await context.HttpContext.Response.WriteAsync(payload, ct);
     };
 
-    // Chặt hơn cho Auth (15 req / phút / IP)
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -82,7 +85,6 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
-    // Toàn cục cho các endpoint khác (120 req / phút / IP)
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -106,23 +108,33 @@ builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<JwtTokenGenerator>();
 
-// 6. Combat Engine + Sandboxed Lua Skill Runner (MoonSharp)
+// 6. Internal Domain Event Bus + Event Handlers (Decoupled Architecture)
+builder.Services.AddScoped<IGameEventBus, InProcessGameEventBus>();
+builder.Services.AddScoped<IGameEventHandler<StageClearedEvent>, QuestEventHandlers>();
+builder.Services.AddScoped<IGameEventHandler<GachaSummonedEvent>, QuestEventHandlers>();
+builder.Services.AddScoped<IGameEventHandler<ShopPurchasedEvent>, QuestEventHandlers>();
+
+// 7. Combat Engine + Sandboxed Lua Skill Runner (MoonSharp)
 builder.Services.AddSingleton<LuaSkillRunner>();
 builder.Services.AddSingleton<TurnBasedCombatEngine>();
 
-// 7. Game Modules
+// 8. Game Modules (Chặng 1 + 2 + 3)
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<HeroService>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<BattleService>();
+builder.Services.AddScoped<GachaService>();
+builder.Services.AddScoped<ShopService>();
+builder.Services.AddScoped<QuestService>();
+builder.Services.AddScoped<MailService>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Tự động tạo file SQLite & làm mới schema dev nếu DB cũ chưa có bảng mới nhất (RefreshTokens)
+// Tự động tạo file SQLite, nâng cấp schema dev nếu cần, và seed 1 thư Global Mail đền bù mẫu
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GameDbContext>();
@@ -131,7 +143,7 @@ using (var scope = app.Services.CreateScope())
     var conn = db.Database.GetDbConnection();
     conn.Open();
     using var cmd = conn.CreateCommand();
-    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='RefreshTokens';";
+    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='GlobalMails';";
     var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
     conn.Close();
 
@@ -140,9 +152,40 @@ using (var scope = app.Services.CreateScope())
         db.Database.EnsureDeleted();
         db.Database.EnsureCreated();
     }
+
+    if (!db.GlobalMails.Any())
+    {
+        var nowUtc = DateTime.UtcNow;
+        db.GlobalMails.AddRange(
+            new GlobalMail
+            {
+                Id = Guid.NewGuid(),
+                Title = "🎁 Quà Chào Mừng Mở Server (Chặng 3)",
+                Body = "Cảm ơn bạn đã tham gia thử nghiệm! Tặng bạn 1.000 Gems (đủ quay 10 lần Gacha kích hoạt bảo hiểm 5★) và 1.000 Gold.",
+                RewardGold = 1000,
+                RewardGems = 1000,
+                RewardItemId = "stone_enhance",
+                RewardItemQty = 5,
+                CreatedAtUtc = nowUtc,
+                ExpiresAtUtc = nowUtc.AddDays(30)
+            },
+            new GlobalMail
+            {
+                Id = Guid.NewGuid(),
+                Title = "🛠️ Đền Bù Bảo Trì Định Kỳ",
+                Body = "Server vừa nâng cấp hệ thống Event Bus, Gacha Pity và Cửa Hàng ngày. Chúc bạn chơi game vui vẻ!",
+                RewardGold = 500,
+                RewardGems = 200,
+                RewardItemId = "potion_exp_small",
+                RewardItemQty = 5,
+                CreatedAtUtc = nowUtc,
+                ExpiresAtUtc = nowUtc.AddDays(30)
+            });
+        db.SaveChanges();
+    }
 }
 
-// 8. HTTP Pipeline (Thứ tự middleware cực kỳ quan trọng!)
+// 9. HTTP Pipeline (Thứ tự middleware cực kỳ quan trọng!)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -153,7 +196,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Phục vụ giao diện game test HTML trong thư mục wwwroot/ (mở tại http://localhost:5098/)
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -162,7 +204,6 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Thứ tự vàng: Khóa theo PlayerId trước -> rồi mới kiểm tra Idempotency Key!
 app.UseMiddleware<PlayerLockMiddleware>();
 app.UseMiddleware<IdempotencyMiddleware>();
 

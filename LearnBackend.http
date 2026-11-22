@@ -70,3 +70,30 @@ Content-Type: application/json
   "refreshToken": "{{login.response.body.data.refreshToken}}"
 }
 
+### 13. Xem Hòm Thư toàn server (Global Mail)
+GET {{baseUrl}}/api/mail
+Authorization: Bearer {{token}}
+
+### 14. Xem Banner Gacha & tiến độ Bảo Hiểm (Pity)
+GET {{baseUrl}}/api/gacha/banners
+Authorization: Bearer {{token}}
+
+### 15. Quay Gacha 10 lần (Soft Pity từ lượt 7, Hard Pity 100% 5★ ở lượt 10)
+POST {{baseUrl}}/api/gacha/pull
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bannerId": "banner_standard",
+  "count": 10
+}
+
+### 16. Xem Cửa Hàng (Daily Reset theo PeriodKey UTC)
+GET {{baseUrl}}/api/shop
+Authorization: Bearer {{token}}
+
+### 17. Xem Nhiệm Vụ hằng ngày (tự cập nhật qua Event Bus)
+GET {{baseUrl}}/api/quests
+Authorization: Bearer {{token}}
+
+

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using LearnBackend.Common.Events;
 using LearnBackend.Common.Exceptions;
 using LearnBackend.Infrastructure.Persistence;
 using LearnBackend.Modules.Battle.DTOs;
@@ -17,7 +18,8 @@ namespace LearnBackend.Modules.Battle;
 public sealed class BattleService(
     GameDbContext db,
     MasterDataStore masterData,
-    TurnBasedCombatEngine combatEngine)
+    TurnBasedCombatEngine combatEngine,
+    IGameEventBus eventBus)
 {
     public async Task<BattleRunResponse> RunStageAsync(Guid playerId, string stageId, CancellationToken ct)
     {
@@ -171,6 +173,9 @@ public sealed class BattleService(
                 LeveledUp: levelsGained > 0,
                 NewPlayerLevel: player.Level,
                 Drops: drops);
+
+            // Phát sự kiện nội bộ -> Module Quest tự lắng nghe cộng tiến độ nhiệm vụ
+            await eventBus.PublishAsync(new StageClearedEvent(player.Id, stage.Id, nowUtc), ct);
         }
 
         await db.SaveChangesAsync(ct);

@@ -7,9 +7,6 @@ namespace LearnBackend.Modules.MasterData;
 [Route("api/master-data")]
 public sealed class MasterDataController(MasterDataStore masterData) : ControllerBase
 {
-    /// <summary>
-    /// Client Unity tải toàn bộ config tĩnh khi mở game.
-    /// </summary>
     [HttpGet]
     public IActionResult GetAll()
     {
@@ -19,7 +16,10 @@ public sealed class MasterDataController(MasterDataStore masterData) : Controlle
             heroes = masterData.Heroes.Values,
             enemies = masterData.Enemies.Values,
             items = masterData.Items.Values,
-            stages = masterData.Stages.Values
+            stages = masterData.Stages.Values,
+            banners = masterData.Banners.Values,
+            shopItems = masterData.ShopItems.Values,
+            quests = masterData.Quests.Values
         }));
     }
 

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "banner_standard",
+    "name": "Triệu Hồi Tinh Tú (Bảo Hiểm 10 Lượt)",
+    "description": "Tỉ lệ cơ bản 5★ là 5%. Từ lượt 7 kích hoạt Soft Pity (+15%/lượt), lượt 10 chắc chắn 100% ra 5★!",
+    "costGemsPerPull": 100,
+    "baseFiveStarRate": 0.05,
+    "baseFourStarRate": 0.25,
+    "softPityStart": 7,
+    "softPityRateStep": 0.15,
+    "hardPity": 10,
+    "fiveStarHeroIds": ["hero_celestia", "hero_ignis"],
+    "fourStarHeroIds": ["hero_arthur", "hero_lyra"],
+    "threeStarHeroIds": ["hero_kael"]
+  }
+]

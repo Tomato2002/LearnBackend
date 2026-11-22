@@ -5,8 +5,7 @@ using LearnBackend.Modules.MasterData.Models;
 namespace LearnBackend.Modules.MasterData;
 
 /// <summary>
-/// Singleton giữ toàn bộ dữ liệu tĩnh của game (Config Hero, Enemy, Item, Stage, Luật game...) trên RAM.
-/// Dùng FrozenDictionary để đọc cực nhanh O(1), không bao giờ phải query DB cho dữ liệu tĩnh.
+/// Singleton giữ toàn bộ dữ liệu tĩnh của game trên RAM bằng FrozenDictionary O(1).
 /// </summary>
 public sealed class MasterDataStore
 {
@@ -20,24 +19,29 @@ public sealed class MasterDataStore
     public FrozenDictionary<string, EnemyConfig> Enemies { get; }
     public FrozenDictionary<string, ItemConfig> Items { get; }
     public FrozenDictionary<string, StageConfig> Stages { get; }
+    public FrozenDictionary<string, BannerConfig> Banners { get; }
+    public FrozenDictionary<string, ShopItemConfig> ShopItems { get; }
+    public FrozenDictionary<string, QuestConfig> Quests { get; }
 
     public MasterDataStore(IWebHostEnvironment env)
     {
         var baseDir = Path.Combine(env.ContentRootPath, "Data", "MasterData");
 
         GameRules = LoadJson<GameRulesConfig>(Path.Combine(baseDir, "game_rules.json"));
-
-        var heroes = LoadJson<List<HeroConfig>>(Path.Combine(baseDir, "heroes.json"));
-        Heroes = heroes.ToFrozenDictionary(h => h.Id, StringComparer.OrdinalIgnoreCase);
-
-        var enemies = LoadJson<List<EnemyConfig>>(Path.Combine(baseDir, "enemies.json"));
-        Enemies = enemies.ToFrozenDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
-
-        var items = LoadJson<List<ItemConfig>>(Path.Combine(baseDir, "items.json"));
-        Items = items.ToFrozenDictionary(i => i.Id, StringComparer.OrdinalIgnoreCase);
-
-        var stages = LoadJson<List<StageConfig>>(Path.Combine(baseDir, "stages.json"));
-        Stages = stages.ToFrozenDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
+        Heroes = LoadJson<List<HeroConfig>>(Path.Combine(baseDir, "heroes.json"))
+            .ToFrozenDictionary(h => h.Id, StringComparer.OrdinalIgnoreCase);
+        Enemies = LoadJson<List<EnemyConfig>>(Path.Combine(baseDir, "enemies.json"))
+            .ToFrozenDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
+        Items = LoadJson<List<ItemConfig>>(Path.Combine(baseDir, "items.json"))
+            .ToFrozenDictionary(i => i.Id, StringComparer.OrdinalIgnoreCase);
+        Stages = LoadJson<List<StageConfig>>(Path.Combine(baseDir, "stages.json"))
+            .ToFrozenDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
+        Banners = LoadJson<List<BannerConfig>>(Path.Combine(baseDir, "banners.json"))
+            .ToFrozenDictionary(b => b.Id, StringComparer.OrdinalIgnoreCase);
+        ShopItems = LoadJson<List<ShopItemConfig>>(Path.Combine(baseDir, "shop_items.json"))
+            .ToFrozenDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
+        Quests = LoadJson<List<QuestConfig>>(Path.Combine(baseDir, "quests.json"))
+            .ToFrozenDictionary(q => q.Id, StringComparer.OrdinalIgnoreCase);
     }
 
     private static T LoadJson<T>(string filePath)

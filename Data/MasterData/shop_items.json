@@ -1,0 +1,29 @@
+[
+  {
+    "id": "shop_exp_pack",
+    "name": "Gói 5 Bình Kinh Nghiệm",
+    "currencyType": "Gold",
+    "price": 300,
+    "rewardItemId": "potion_exp_small",
+    "rewardQuantity": 5,
+    "dailyLimit": 3
+  },
+  {
+    "id": "shop_stone_pack",
+    "name": "Gói 5 Đá Cường Hóa",
+    "currencyType": "Gold",
+    "price": 400,
+    "rewardItemId": "stone_enhance",
+    "rewardQuantity": 5,
+    "dailyLimit": 3
+  },
+  {
+    "id": "shop_armor_knight",
+    "name": "Giáp Bạc Hoàng Gia (Hiếm 4★)",
+    "currencyType": "Gems",
+    "price": 150,
+    "rewardItemId": "armor_knight",
+    "rewardQuantity": 1,
+    "dailyLimit": 1
+  }
+]

@@ -31,5 +31,27 @@
     "baseDef": 90,
     "baseSpeed": 112,
     "skillIds": ["skill_water_bolt", "skill_healing_wave"]
+  },
+  {
+    "id": "hero_celestia",
+    "name": "Celestia - Nữ Thần Tinh Tú",
+    "element": "Light",
+    "rarity": 5,
+    "baseHp": 1150,
+    "baseAtk": 210,
+    "baseDef": 95,
+    "baseSpeed": 124,
+    "skillIds": ["skill_slash", "skill_phoenix_rebirth"]
+  },
+  {
+    "id": "hero_kael",
+    "name": "Kael - Lính Đánh Thuê",
+    "element": "Fire",
+    "rarity": 3,
+    "baseHp": 900,
+    "baseAtk": 115,
+    "baseDef": 70,
+    "baseSpeed": 100,
+    "skillIds": ["skill_slash"]
   }
 ]

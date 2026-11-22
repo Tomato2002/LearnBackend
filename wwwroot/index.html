@@ -280,19 +280,45 @@
 
       <!-- Tabs -->
       <nav class="nav-tabs">
-        <button class="nav-tab active" data-tab="stages" onclick="switchTab('stages')">⚔️ Chiến Dịch (Đánh Ải + Lua)</button>
-        <button class="nav-tab" data-tab="heroes" onclick="switchTab('heroes')">🛡️ Đội Hình Hero</button>
-        <button class="nav-tab" data-tab="inventory" onclick="switchTab('inventory')">🎒 Túi Đồ & Trang Bị</button>
-        <button class="nav-tab" data-tab="lua" onclick="switchTab('lua')">🌙 Lua Skill Scripts</button>
-        <button class="nav-tab" data-tab="ledger" onclick="switchTab('ledger')">📜 Sổ Cái (Ledger)</button>
+        <button class="nav-tab active" data-tab="stages" onclick="switchTab('stages')">⚔️ Chiến Dịch</button>
+        <button class="nav-tab" data-tab="gacha" onclick="switchTab('gacha')">🌟 Gacha</button>
+        <button class="nav-tab" data-tab="shop" onclick="switchTab('shop')">🛒 Cửa Hàng</button>
+        <button class="nav-tab" data-tab="quests" onclick="switchTab('quests')">🎯 Nhiệm Vụ <span id="questDot" class="badge badge-danger hidden">0</span></button>
+        <button class="nav-tab" data-tab="mail" onclick="switchTab('mail')">📬 Hòm Thư <span id="mailDot" class="badge badge-danger hidden">0</span></button>
+        <button class="nav-tab" data-tab="heroes" onclick="switchTab('heroes')">🛡️ Đội Hình</button>
+        <button class="nav-tab" data-tab="inventory" onclick="switchTab('inventory')">🎒 Túi Đồ</button>
+        <button class="nav-tab" data-tab="lua" onclick="switchTab('lua')">🌙 Lua Skills</button>
+        <button class="nav-tab" data-tab="ledger" onclick="switchTab('ledger')">📜 Sổ Cái</button>
       </nav>
 
       <!-- TAB 1: STAGES & BATTLE ARENA -->
       <div id="panel-stages">
         <div class="grid" id="stagesGrid"></div>
-
-        <!-- Battle Result & Lua Turn Log -->
         <div id="battleResultPanel" class="battle-panel hidden"></div>
+      </div>
+
+      <!-- TAB: GACHA -->
+      <div id="panel-gacha" class="hidden">
+        <div id="gachaBannerBox"></div>
+        <div id="gachaResultPanel" class="battle-panel hidden"></div>
+      </div>
+
+      <!-- TAB: SHOP -->
+      <div id="panel-shop" class="hidden">
+        <p class="muted" style="margin-bottom:14px;">Giới hạn mua tự động reset mỗi ngày theo <code>PeriodKey (UTC)</code> không cần cron job!</p>
+        <div class="grid" id="shopGrid"></div>
+      </div>
+
+      <!-- TAB: QUESTS -->
+      <div id="panel-quests" class="hidden">
+        <p class="muted" style="margin-bottom:14px;">Tiến độ nhiệm vụ tự động cập nhật qua <strong>Internal Event Bus</strong> khi bạn đánh thắng ải, quay Gacha hoặc mua Shop!</p>
+        <div class="grid" id="questsGrid"></div>
+      </div>
+
+      <!-- TAB: MAIL -->
+      <div id="panel-mail" class="hidden">
+        <p class="muted" style="margin-bottom:14px;"><strong>Global Mail Pattern:</strong> 1 dòng DB phát quà cho toàn server, mỗi người chỉ nhận 1 lần qua bảng <code>PlayerGlobalMailClaims</code>.</p>
+        <div class="grid" id="mailGrid"></div>
       </div>
 
       <!-- TAB 2: MY HEROES -->
@@ -535,11 +561,15 @@
 
     async function refreshAll() {
       try {
-        const [md, profile, heroes, inv] = await Promise.all([
+        const [md, profile, heroes, inv, banners, shop, quests, mails] = await Promise.all([
           apiFetch('GET', '/api/master-data', null, false),
           apiFetch('GET', '/api/player/me'),
           apiFetch('GET', '/api/heroes'),
-          apiFetch('GET', '/api/inventory')
+          apiFetch('GET', '/api/inventory'),
+          apiFetch('GET', '/api/gacha/banners'),
+          apiFetch('GET', '/api/shop'),
+          apiFetch('GET', '/api/quests'),
+          apiFetch('GET', '/api/mail')
         ]);
         masterData = md;
         myHeroes = heroes;
@@ -549,6 +579,10 @@
         renderStages();
         renderHeroes();
         renderInventory();
+        renderGacha(banners);
+        renderShop(shop);
+        renderQuests(quests);
+        renderMail(mails);
         await loadLedger();
       } catch { /* handled */ }
     }
@@ -859,9 +893,172 @@
       } catch { /* ignore */ }
     }
 
+    // --- Stage 3: Gacha, Shop, Quest, Mail ---
+    function renderGacha(banners) {
+      const box = document.getElementById('gachaBannerBox');
+      if (!banners?.length) return;
+      box.innerHTML = banners.map(b => {
+        const pct = Math.min(100, Math.round((b.currentPity / Math.max(1, b.hardPity)) * 100));
+        return `
+          <div class="card" style="margin-bottom:16px;">
+            <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+              <h3 style="font-size:18px;">🌟 ${escapeHtml(b.name)}</h3>
+              <span class="badge badge-gold">Tỉ lệ 5★ lượt tới: ${Math.round(b.currentFiveStarRate * 100)}%</span>
+            </div>
+            <p class="muted" style="margin-bottom:12px;">${escapeHtml(b.description)}</p>
+            <div style="margin-bottom:14px;">
+              <div class="row" style="justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                <span>Bảo hiểm Pity: <strong>${b.currentPity} / ${b.hardPity}</strong> (Soft Pity từ lượt ${b.softPityStart})</span>
+                <span class="muted">Tổng đã quay: ${b.totalPulls}</span>
+              </div>
+              <div class="progress-bar" style="height:8px;"><div class="progress-fill" style="width:${pct}%; background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div></div>
+            </div>
+            <div class="row">
+              <button class="btn-primary" onclick="pullGacha('${escapeHtml(b.id)}', 1)">✨ Quay x1 (${b.costGemsPerPull} 💎)</button>
+              <button class="btn-gold" onclick="pullGacha('${escapeHtml(b.id)}', 10)">🌟 Quay x10 (${b.costGemsPerPull * 10} 💎 — Chắc chắn 5★!)</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    async function pullGacha(bannerId, count) {
+      try {
+        const res = await apiFetch('POST', '/api/gacha/pull', { bannerId, count });
+        const panel = document.getElementById('gachaResultPanel');
+        panel.classList.remove('hidden');
+        panel.innerHTML = `
+          <div class="section-title">🎉 Kết quả Triệu Hồi x${count} (Pity mới: ${res.newPityCounter}/${res.hardPity})</div>
+          <div class="grid">
+            ${res.results.map(r => `
+              <div class="game-card" style="${r.rarity === 5 ? 'border-color:var(--gold); background:rgba(245,185,66,0.08);' : ''}">
+                <div class="row" style="justify-content:space-between;">
+                  <strong>${escapeHtml(r.heroName)}</strong>
+                  <span class="badge badge-${escapeHtml(r.element)}">${escapeHtml(r.element)}</span>
+                </div>
+                <div style="color:${r.rarity === 5 ? 'var(--gold)' : r.rarity === 4 ? 'var(--accent)' : 'var(--muted)'}; font-size:14px;">
+                  ${'★'.repeat(r.rarity)} ${r.wasPityTriggered ? '<span class="badge badge-gold">BẢO HIỂM PITY!</span>' : ''}
+                </div>
+                <div class="muted" style="font-size:12px;">
+                  ${r.isNewHero ? '🆕 <strong style="color:var(--stamina)">Tướng Mới!</strong>' : `♻️ Trùng tướng → ${escapeHtml(r.duplicateCompensation)}`}
+                </div>
+              </div>`).join('')}
+          </div>`;
+        showToast(`Triệu hồi x${count} thành công!`, 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    function renderShop(items) {
+      const grid = document.getElementById('shopGrid');
+      if (!items?.length) return;
+      grid.innerHTML = items.map(s => `
+        <div class="game-card">
+          <div>
+            <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+              <strong>${escapeHtml(s.name)}</strong>
+              <span class="badge ${s.remainingToday > 0 ? 'badge-ok' : 'badge-danger'}">Còn ${s.remainingToday}/${s.dailyLimit} hôm nay</span>
+            </div>
+            <p class="muted" style="font-size:12px; margin-bottom:10px;">Nhận: <code>${escapeHtml(s.rewardItemId)}</code> x${s.rewardQuantity}</p>
+          </div>
+          <button class="${s.currencyType === 'Gems' ? 'btn-primary' : 'btn-gold'}" ${s.remainingToday <= 0 ? 'disabled' : ''}
+            onclick="buyShopItem('${escapeHtml(s.id)}')">
+            🛒 Mua (${s.price} ${s.currencyType === 'Gems' ? '💎' : '🪙'})
+          </button>
+        </div>`).join('');
+    }
+
+    async function buyShopItem(shopItemId) {
+      try {
+        await apiFetch('POST', '/api/shop/buy', { shopItemId, quantity: 1 });
+        showToast('Mua hàng thành công!', 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    function renderQuests(quests) {
+      const grid = document.getElementById('questsGrid');
+      const claimable = (quests || []).filter(q => q.isCompleted && !q.isClaimed).length;
+      const dot = document.getElementById('questDot');
+      dot.textContent = claimable;
+      dot.classList.toggle('hidden', claimable === 0);
+
+      grid.innerHTML = (quests || []).map(q => {
+        const pct = Math.min(100, Math.round((q.currentProgress / Math.max(1, q.targetCount)) * 100));
+        return `
+          <div class="game-card">
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                <strong>${escapeHtml(q.title)}</strong>
+                <span class="badge ${q.isClaimed ? 'badge-ok' : q.isCompleted ? 'badge-gold' : 'badge-info'}">
+                  ${q.isClaimed ? 'Đã nhận' : `${q.currentProgress}/${q.targetCount}`}
+                </span>
+              </div>
+              <p class="muted" style="font-size:12px; margin-bottom:8px;">${escapeHtml(q.description)}</p>
+              <div class="progress-bar" style="height:6px; margin-bottom:10px;"><div class="progress-fill" style="width:${pct}%;"></div></div>
+              <div class="row">
+                ${q.rewardGold ? `<span class="badge badge-gold">+${q.rewardGold} 🪙</span>` : ''}
+                ${q.rewardGems ? `<span class="badge badge-info">+${q.rewardGems} 💎</span>` : ''}
+                ${q.rewardItemId ? `<span class="badge badge-ok">+${q.rewardItemQty} ${escapeHtml(q.rewardItemId)}</span>` : ''}
+              </div>
+            </div>
+            <button class="btn-emerald" ${(!q.isCompleted || q.isClaimed) ? 'disabled' : ''} onclick="claimQuest('${escapeHtml(q.id)}')">
+              ${q.isClaimed ? '✅ Đã nhận thưởng' : q.isCompleted ? '🎁 Nhận Thưởng' : 'Chưa hoàn thành'}
+            </button>
+          </div>`;
+      }).join('');
+    }
+
+    async function claimQuest(questId) {
+      try {
+        await apiFetch('POST', `/api/quests/${questId}/claim`);
+        showToast('Nhận thưởng nhiệm vụ thành công!', 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    function renderMail(mails) {
+      const grid = document.getElementById('mailGrid');
+      const unread = (mails || []).filter(m => !m.isClaimed).length;
+      const dot = document.getElementById('mailDot');
+      dot.textContent = unread;
+      dot.classList.toggle('hidden', unread === 0);
+
+      if (!mails?.length) {
+        grid.innerHTML = '<div class="muted">Hòm thư trống.</div>';
+        return;
+      }
+
+      grid.innerHTML = mails.map(m => `
+        <div class="game-card">
+          <div>
+            <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+              <strong>${escapeHtml(m.title)}</strong>
+              <span class="badge ${m.isClaimed ? 'badge-ok' : 'badge-danger'}">${m.isClaimed ? 'Đã nhận' : 'Mới'}</span>
+            </div>
+            <p class="muted" style="font-size:12px; margin-bottom:10px;">${escapeHtml(m.body)}</p>
+            <div class="row">
+              ${m.rewardGold ? `<span class="badge badge-gold">+${m.rewardGold} 🪙</span>` : ''}
+              ${m.rewardGems ? `<span class="badge badge-info">+${m.rewardGems} 💎</span>` : ''}
+              ${m.rewardItemId ? `<span class="badge badge-ok">+${m.rewardItemQty} ${escapeHtml(m.rewardItemId)}</span>` : ''}
+            </div>
+          </div>
+          <button class="btn-gold" ${m.isClaimed ? 'disabled' : ''} onclick="claimMail('${m.id}')">
+            ${m.isClaimed ? '✅ Đã nhận quà' : '📬 Nhận Quà Thư'}
+          </button>
+        </div>`).join('');
+    }
+
+    async function claimMail(mailId) {
+      try {
+        await apiFetch('POST', `/api/mail/${mailId}/claim`);
+        showToast('Đã nhận quà từ Hòm Thư!', 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
     function switchTab(tab) {
       document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-      ['stages', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
+      ['stages', 'gacha', 'shop', 'quests', 'mail', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
         document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
       });
       if (tab === 'ledger') loadLedger();
