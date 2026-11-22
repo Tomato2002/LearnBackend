@@ -6,7 +6,12 @@
     "recommendedLevel": 1,
     "expReward": 50,
     "goldReward": 120,
-    "enemyIds": ["goblin_scout", "goblin_scout"]
+    "enemyIds": ["goblin_scout", "goblin_scout"],
+    "dropTable": [
+      { "itemId": "potion_exp_small", "chance": 1.0, "minQty": 1, "maxQty": 2 },
+      { "itemId": "stone_enhance", "chance": 0.7, "minQty": 1, "maxQty": 2 },
+      { "itemId": "sword_iron", "chance": 0.35, "minQty": 1, "maxQty": 1 }
+    ]
   },
   {
     "id": "stage_1_2",
@@ -15,7 +20,12 @@
     "recommendedLevel": 2,
     "expReward": 95,
     "goldReward": 220,
-    "enemyIds": ["forest_wolf", "forest_wolf", "alpha_wolf"]
+    "enemyIds": ["forest_wolf", "forest_wolf", "alpha_wolf"],
+    "dropTable": [
+      { "itemId": "potion_exp_small", "chance": 1.0, "minQty": 2, "maxQty": 3 },
+      { "itemId": "stone_enhance", "chance": 0.85, "minQty": 2, "maxQty": 3 },
+      { "itemId": "armor_knight", "chance": 0.4, "minQty": 1, "maxQty": 1 }
+    ]
   },
   {
     "id": "stage_1_boss",
@@ -24,6 +34,11 @@
     "recommendedLevel": 5,
     "expReward": 320,
     "goldReward": 800,
-    "enemyIds": ["fire_dragon_boss"]
+    "enemyIds": ["fire_dragon_boss"],
+    "dropTable": [
+      { "itemId": "potion_exp_small", "chance": 1.0, "minQty": 3, "maxQty": 5 },
+      { "itemId": "stone_enhance", "chance": 1.0, "minQty": 3, "maxQty": 5 },
+      { "itemId": "ring_flame", "chance": 0.6, "minQty": 1, "maxQty": 1 }
+    ]
   }
 ]

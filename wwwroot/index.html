@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Turn-Based RPG — Client Simulator</title>
+  <title>Turn-Based RPG — Client Simulator (Chặng 2)</title>
   <style>
     :root {
       --bg: #0b0e14;
@@ -31,20 +31,13 @@
       line-height: 1.5;
     }
 
-    .container { max-width: 1120px; margin: 0 auto; padding: 20px; }
+    .container { max-width: 1160px; margin: 0 auto; padding: 20px; }
 
     /* Top HUD */
     .hud {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      background: rgba(20, 25, 35, 0.92);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px 18px;
-      margin-bottom: 20px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 14px; background: rgba(20, 25, 35, 0.94); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 18px; margin-bottom: 20px;
       backdrop-filter: blur(8px);
     }
     .brand { display: flex; align-items: center; gap: 12px; }
@@ -57,19 +50,15 @@
     .player-name { font-weight: 700; font-size: 16px; }
     .player-lvl { font-size: 12px; color: var(--muted); }
 
-    .resources { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .resources { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .pill {
       display: flex; align-items: center; gap: 8px;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 14px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 10px; font-weight: 600; font-size: 14px;
     }
     .pill.gold { color: var(--gold); }
     .pill.gem { color: var(--gem); }
-    .pill.stamina { color: var(--stamina); flex-direction: column; align-items: flex-start; gap: 2px; min-width: 185px; }
+    .pill.stamina { color: var(--stamina); flex-direction: column; align-items: flex-start; gap: 2px; min-width: 190px; }
     .stamina-row { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; }
     .stamina-timer { font-size: 11px; color: var(--muted); font-weight: 500; }
     .progress-bar { width: 100%; height: 5px; background: #0f172a; border-radius: 99px; overflow: hidden; margin-top: 2px; }
@@ -77,14 +66,9 @@
 
     /* Buttons */
     button {
-      cursor: pointer;
-      border: 1px solid transparent;
-      border-radius: 9px;
-      padding: 8px 14px;
-      font-weight: 600;
-      font-size: 13px;
-      transition: all 0.15s ease;
-      font-family: inherit;
+      cursor: pointer; border: 1px solid transparent; border-radius: 9px;
+      padding: 8px 14px; font-weight: 600; font-size: 13px;
+      transition: all 0.15s ease; font-family: inherit;
     }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; }
@@ -98,14 +82,16 @@
     .btn-danger { background: rgba(244, 63, 94, 0.14); color: var(--danger); border-color: rgba(244, 63, 94, 0.35); }
     .btn-danger:hover:not(:disabled) { background: rgba(244, 63, 94, 0.25); }
 
+    select {
+      padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 12px; font-family: inherit;
+    }
+
     /* Auth Card */
     .auth-wrap { max-width: 430px; margin: 56px auto; }
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 22px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
     }
     .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
     .auth-tab { background: var(--surface-2); color: var(--muted); padding: 10px; border-radius: 10px; border: 1px solid var(--border); }
@@ -122,41 +108,31 @@
     /* Navigation Tabs */
     .nav-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
     .nav-tab {
-      background: var(--surface);
-      color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 10px 16px;
-      border-radius: 10px;
+      background: var(--surface); color: var(--muted);
+      border: 1px solid var(--border); padding: 10px 16px; border-radius: 10px;
     }
-    .nav-tab.active {
-      background: rgba(99, 102, 241, 0.18);
-      color: #fff;
-      border-color: var(--accent);
-    }
+    .nav-tab.active { background: rgba(99, 102, 241, 0.18); color: #fff; border-color: var(--accent); }
 
     /* Grids */
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(305px, 1fr)); gap: 16px; }
     .game-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;
       transition: border-color 0.15s ease, transform 0.15s ease;
     }
     .game-card:hover { border-color: #3f4f6b; transform: translateY(-2px); }
 
     .badge {
       display: inline-block; padding: 3px 8px; border-radius: 6px;
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      font-size: 11px; font-weight: 700;
     }
     .badge-Fire { background: rgba(251, 113, 133, 0.18); color: var(--fire); }
     .badge-Water { background: rgba(56, 189, 248, 0.18); color: var(--water); }
     .badge-Light { background: rgba(252, 211, 77, 0.18); color: var(--light); }
     .badge-info { background: rgba(129, 140, 248, 0.18); color: var(--accent); }
+    .badge-ok { background: rgba(52, 211, 153, 0.18); color: var(--stamina); }
+    .badge-gold { background: rgba(245, 185, 66, 0.18); color: var(--gold); }
+    .badge-danger { background: rgba(244, 63, 94, 0.18); color: var(--danger); }
 
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .stat-box {
@@ -165,6 +141,30 @@
     }
     .stat-box .k { font-size: 10px; color: var(--muted); display: block; }
     .stat-box .v { font-size: 14px; font-weight: 700; }
+
+    /* Battle Result Box */
+    .battle-panel {
+      margin-top: 18px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px;
+    }
+    .battle-banner {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 14px 16px; border-radius: 12px; margin-bottom: 16px;
+    }
+    .battle-banner.win { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(52, 211, 153, 0.45); }
+    .battle-banner.lose { background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.45); }
+    .combat-log-list {
+      max-height: 290px; overflow-y: auto; background: #0d1117;
+      border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+      font-size: 13px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .turn-row {
+      padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.02);
+      border-left: 3px solid var(--border);
+    }
+    .turn-row.hero { border-left-color: var(--gem); }
+    .turn-row.enemy { border-left-color: var(--danger); }
+    .turn-row.heal { border-left-color: var(--stamina); }
 
     /* Table */
     .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
@@ -176,12 +176,11 @@
     .delta-neg { color: var(--danger); font-weight: 700; }
 
     /* Toast */
-    .toast-box { position: fixed; top: 18px; right: 18px; z-index: 999; display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
+    .toast-box { position: fixed; top: 18px; right: 18px; z-index: 999; display: flex; flex-direction: column; gap: 8px; max-width: 380px; }
     .toast {
       padding: 12px 14px; border-radius: 10px; font-size: 13px; font-weight: 500;
       border: 1px solid var(--border); background: var(--surface-2);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
-      animation: slideIn 0.2s ease;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45); animation: slideIn 0.2s ease;
     }
     .toast.ok { border-color: rgba(52, 211, 153, 0.5); color: #a7f3d0; }
     .toast.err { border-color: rgba(244, 63, 94, 0.6); color: #fda4af; }
@@ -189,11 +188,8 @@
 
     /* API Inspector */
     .inspector {
-      margin-top: 24px;
-      background: #0d1117;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
+      margin-top: 24px; background: #0d1117; border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden;
     }
     .inspector-head {
       display: flex; justify-content: space-between; align-items: center;
@@ -214,6 +210,7 @@
     .hidden { display: none !important; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .muted { color: var(--muted); font-size: 13px; }
+    .section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -224,7 +221,7 @@
     <section id="authView" class="auth-wrap">
       <div style="text-align:center; margin-bottom:20px;">
         <h1 style="font-size:24px; margin-bottom:4px;">⚔️ Turn-Based RPG Simulator</h1>
-        <p class="muted">Client HTML test trực tiếp API .NET Backend (tự động gắn JWT)</p>
+        <p class="muted">Chặng 2: Hero • Inventory • Turn-Based Battle + Lua (MoonSharp)</p>
       </div>
       <div class="card">
         <div class="auth-tabs">
@@ -271,51 +268,62 @@
           <div class="pill stamina">
             <div class="stamina-row">
               <span>⚡ <span id="hudStamina">0/100</span></span>
-              <button class="btn-gold" style="padding:3px 8px; font-size:11px;" onclick="refillStamina()" title="Mua +60 thể lực bằng 50 Gems">+60 (50💎)</button>
+              <button class="btn-gold" style="padding:3px 8px; font-size:11px;" onclick="refillStamina()">+60 (50💎)</button>
             </div>
             <div class="progress-bar"><div class="progress-fill" id="staminaBar" style="width:100%;"></div></div>
             <div class="stamina-timer" id="hudStaminaTimer">Đã đầy thể lực</div>
           </div>
-          <button class="btn-ghost" onclick="refreshAll()" title="Đồng bộ lại từ server">🔄 Sync</button>
+          <button class="btn-ghost" onclick="refreshAll()">🔄 Sync</button>
           <button class="btn-danger" onclick="logout()">Đăng xuất</button>
         </div>
       </header>
 
       <!-- Tabs -->
       <nav class="nav-tabs">
-        <button class="nav-tab active" data-tab="stages" onclick="switchTab('stages')">🗺️ Chiến Dịch (Test Stamina)</button>
-        <button class="nav-tab" data-tab="heroes" onclick="switchTab('heroes')">🛡️ Tướng (MasterData)</button>
-        <button class="nav-tab" data-tab="ledger" onclick="switchTab('ledger')">📜 Sổ Cái Kinh Tế (Ledger)</button>
+        <button class="nav-tab active" data-tab="stages" onclick="switchTab('stages')">⚔️ Chiến Dịch (Đánh Ải + Lua)</button>
+        <button class="nav-tab" data-tab="heroes" onclick="switchTab('heroes')">🛡️ Đội Hình Hero</button>
+        <button class="nav-tab" data-tab="inventory" onclick="switchTab('inventory')">🎒 Túi Đồ & Trang Bị</button>
+        <button class="nav-tab" data-tab="lua" onclick="switchTab('lua')">🌙 Lua Skill Scripts</button>
+        <button class="nav-tab" data-tab="ledger" onclick="switchTab('ledger')">📜 Sổ Cái (Ledger)</button>
       </nav>
 
-      <!-- TAB: STAGES -->
+      <!-- TAB 1: STAGES & BATTLE ARENA -->
       <div id="panel-stages">
-        <div class="card" style="margin-bottom:16px; padding:16px;">
-          <div class="row" style="justify-content:space-between;">
-            <div>
-              <strong>⚡ Test nhanh Lazy Stamina</strong>
-              <p class="muted">Bấm vào ải bên dưới hoặc trừ tay một lượng thể lực để xem đồng hồ hồi thể lực chạy live từ server.</p>
-            </div>
-            <div class="row">
-              <input id="customSpendAmount" type="number" value="30" min="1" max="500"
-                style="width:80px; padding:7px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);" />
-              <button class="btn-emerald" onclick="spendCustomStamina()">Trừ Thể Lực</button>
-              <button class="btn-gold" onclick="refillStamina()">Nạp +60 ⚡ (50 💎)</button>
-            </div>
-          </div>
-        </div>
         <div class="grid" id="stagesGrid"></div>
+
+        <!-- Battle Result & Lua Turn Log -->
+        <div id="battleResultPanel" class="battle-panel hidden"></div>
       </div>
 
-      <!-- TAB: HEROES -->
+      <!-- TAB 2: MY HEROES -->
       <div id="panel-heroes" class="hidden">
+        <p class="muted" style="margin-bottom:14px;">
+          Chỉ số hiển thị đã cộng dồn <strong>Chỉ số gốc + Level + Trang bị đang mặc</strong>. Nâng cấp Hero và mặc trang bị để đủ sức hạ <strong>1-Boss: Rồng Lửa</strong>!
+        </p>
         <div class="grid" id="heroesGrid"></div>
       </div>
 
-      <!-- TAB: LEDGER -->
+      <!-- TAB 3: INVENTORY & EQUIPMENT -->
+      <div id="panel-inventory" class="hidden">
+        <div class="section-title">🧪 Nguyên liệu cộng dồn (Stackable Items)</div>
+        <div class="grid" id="materialsGrid" style="margin-bottom:22px;"></div>
+
+        <div class="section-title">🗡️ Trang bị duy nhất (Equipment Instances — có Guid riêng)</div>
+        <div class="grid" id="equipmentsGrid"></div>
+      </div>
+
+      <!-- TAB 4: LUA SCRIPTS VIEWER -->
+      <div id="panel-lua" class="hidden">
+        <p class="muted" style="margin-bottom:14px;">
+          Các file <code>.lua</code> nằm trong <code>Data/Scripts/Skills/</code> đang được nạp sẵn vào <strong>MoonSharp Sandbox</strong> trên server:
+        </p>
+        <div class="grid" id="luaScriptsGrid"></div>
+      </div>
+
+      <!-- TAB 5: LEDGER -->
       <div id="panel-ledger" class="hidden">
         <div class="row" style="justify-content:space-between; margin-bottom:12px;">
-          <p class="muted">Mọi biến động Gold / Gems đều được ghi lại trong bảng <code>CurrencyLedgers</code> (chống gian lận & truy vết).</p>
+          <p class="muted">Mọi biến động Gold / Gems (thắng ải, nâng cấp Hero, cường hóa, nạp thể lực) đều ghi vào <code>CurrencyLedgers</code>.</p>
           <button class="btn-ghost" onclick="loadLedger()">🔄 Tải lại sổ cái</button>
         </div>
         <div class="table-wrap">
@@ -327,7 +335,8 @@
                 <th>Biến động</th>
                 <th>Số dư sau</th>
                 <th>Lý do</th>
-                <th>Thời gian (UTC)</th>
+                <th>Tham chiếu</th>
+                <th>Thời gian</th>
               </tr>
             </thead>
             <tbody id="ledgerBody"></tbody>
@@ -353,10 +362,11 @@
     let authMode = 'login';
     let masterData = null;
     let currentProfile = null;
+    let myHeroes = [];
+    let myInventory = null;
     let staminaCountdown = 0;
     let countdownInterval = null;
 
-    // --- Helper: API Call with automatic Bearer JWT + Inspector Logging ---
     async function apiFetch(method, path, body = null, requiresAuth = true) {
       const headers = { 'Content-Type': 'application/json' };
       const token = localStorage.getItem(TOKEN_KEY);
@@ -394,14 +404,13 @@
       return data;
     }
 
-    // --- Toast & Inspector ---
     function showToast(message, type = 'ok') {
       const box = document.getElementById('toastBox');
       const el = document.createElement('div');
       el.className = `toast ${type}`;
       el.textContent = message;
       box.appendChild(el);
-      setTimeout(() => el.remove(), 3500);
+      setTimeout(() => el.remove(), 3800);
     }
 
     function appendLog(method, path, status, ms, data) {
@@ -412,13 +421,14 @@
       entry.className = 'log-entry';
       const cls = status >= 200 && status < 300 ? 'status-ok' : 'status-err';
       const preview = JSON.stringify(data, null, 2);
+      const shortPreview = preview.length > 1400 ? preview.slice(0, 1400) + '\n... (rút gọn)' : preview;
       entry.innerHTML = `
         <div class="log-meta">
           <span class="${cls}">${status}</span>
           <strong>${method} ${path}</strong>
           <span class="muted">${ms} ms</span>
         </div>
-        <pre>${escapeHtml(preview)}</pre>
+        <pre>${escapeHtml(shortPreview)}</pre>
       `;
       box.prepend(entry);
     }
@@ -428,7 +438,7 @@
     }
 
     function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return String(str ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
     }
 
     // --- Auth ---
@@ -459,9 +469,9 @@
         const res = await apiFetch('POST', endpoint, payload, false);
 
         localStorage.setItem(TOKEN_KEY, res.accessToken);
-        showToast(`Chào mừng ${res.nickname} quay lại!`, 'ok');
+        showToast(`Chào mừng ${res.nickname}!`, 'ok');
         await enterGame();
-      } catch { /* toast already shown */ }
+      } catch { /* handled */ }
     }
 
     function logout(notify = true) {
@@ -472,7 +482,7 @@
       if (notify) showToast('Đã đăng xuất.', 'ok');
     }
 
-    // --- Game Flow ---
+    // --- Main Data Sync ---
     async function enterGame() {
       document.getElementById('authView').classList.add('hidden');
       document.getElementById('gameView').classList.remove('hidden');
@@ -481,14 +491,20 @@
 
     async function refreshAll() {
       try {
-        const [md, profile] = await Promise.all([
+        const [md, profile, heroes, inv] = await Promise.all([
           apiFetch('GET', '/api/master-data', null, false),
-          apiFetch('GET', '/api/player/me', null, true)
+          apiFetch('GET', '/api/player/me'),
+          apiFetch('GET', '/api/heroes'),
+          apiFetch('GET', '/api/inventory')
         ]);
         masterData = md;
+        myHeroes = heroes;
+        myInventory = inv;
+
         renderProfile(profile);
         renderStages();
         renderHeroes();
+        renderInventory();
         await loadLedger();
       } catch { /* handled */ }
     }
@@ -530,7 +546,6 @@
         staminaCountdown--;
         if (staminaCountdown <= 0) {
           clearInterval(countdownInterval);
-          timerEl.textContent = 'Đang đồng bộ thể lực...';
           try {
             const p = await apiFetch('GET', '/api/player/me');
             renderProfile(p);
@@ -541,74 +556,241 @@
       }, 1000);
     }
 
+    // --- Tab 1: Stages & Battle ---
     function renderStages() {
       const grid = document.getElementById('stagesGrid');
       if (!masterData?.stages) return;
 
-      grid.innerHTML = masterData.stages.map(s => `
-        <div class="game-card">
-          <div>
-            <div class="row" style="justify-content:space-between; margin-bottom:8px;">
-              <strong>${escapeHtml(s.name)}</strong>
-              <span class="badge badge-info">Lv.${s.recommendedLevel}+</span>
+      grid.innerHTML = masterData.stages.map(s => {
+        const dropsText = (s.dropTable || []).map(d => `${d.itemId} (${Math.round(d.chance * 100)}%)`).join(', ');
+        return `
+          <div class="game-card">
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+                <strong>${escapeHtml(s.name)}</strong>
+                <span class="badge badge-info">Khuyên dùng Lv.${s.recommendedLevel}+</span>
+              </div>
+              <p class="muted" style="margin-bottom:8px;">Quái: ${s.enemyIds.map(escapeHtml).join(', ')}</p>
+              <div class="row" style="margin-bottom:8px;">
+                <span class="badge badge-gold">+${s.goldReward} Gold</span>
+                <span class="badge badge-info">+${s.expReward} EXP</span>
+              </div>
+              <p class="muted" style="font-size:12px;">Rớt đồ: ${escapeHtml(dropsText)}</p>
             </div>
-            <p class="muted" style="margin-bottom:10px;">Quái: ${s.enemyIds.map(escapeHtml).join(', ')}</p>
-            <div class="row">
-              <span class="badge" style="background:rgba(245,185,66,0.15); color:var(--gold);">+${s.goldReward} Gold</span>
-              <span class="badge" style="background:rgba(129,140,248,0.15); color:var(--accent);">+${s.expReward} EXP</span>
-            </div>
+            <button class="btn-primary" onclick="runStage('${escapeHtml(s.id)}')">
+              ⚔️ Đánh Ải (-${s.staminaCost} ⚡)
+            </button>
           </div>
-          <button class="btn-primary" onclick="spendStamina(${s.staminaCost}, 'Stage:${escapeHtml(s.id)}')">
-            ⚔️ Vào Ải (-${s.staminaCost} ⚡)
-          </button>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
+    async function runStage(stageId) {
+      try {
+        const res = await apiFetch('POST', '/api/battle/run', { stageId });
+        renderProfile(res.updatedProfile);
+        renderBattleResult(res);
+
+        if (res.isVictory) {
+          const lvlMsg = res.rewards?.leveledUp ? ` 🎉 THĂNG CẤP Lv.${res.rewards.newPlayerLevel}!` : '';
+          showToast(`CHIẾN THẮNG! +${res.rewards.goldEarned} Gold, +${res.rewards.expEarned} EXP.${lvlMsg}`, 'ok');
+          // Đồng bộ lại túi đồ & sổ cái
+          myInventory = await apiFetch('GET', '/api/inventory');
+          renderInventory();
+          await loadLedger();
+        } else {
+          showToast(`THẤT BẠI sau ${res.totalRounds} lượt! Hãy nâng cấp Hero hoặc cường hóa trang bị.`, 'err');
+        }
+      } catch { /* handled */ }
+    }
+
+    function renderBattleResult(res) {
+      const panel = document.getElementById('battleResultPanel');
+      panel.classList.remove('hidden');
+
+      const rewardsHtml = res.rewards
+        ? `
+          <div class="row">
+            <span class="badge badge-gold">🪙 +${res.rewards.goldEarned} Gold</span>
+            <span class="badge badge-info">✨ +${res.rewards.expEarned} EXP</span>
+            ${res.rewards.leveledUp ? `<span class="badge badge-ok">⬆️ Lên Lv.${res.rewards.newPlayerLevel}</span>` : ''}
+            ${res.rewards.drops.map(d => `<span class="badge badge-ok">🎁 ${escapeHtml(d.name)} x${d.quantity}</span>`).join('')}
+          </div>`
+        : `<span class="badge badge-danger">Không nhận được phần thưởng</span>`;
+
+      const logsHtml = res.combatLogs.map(l => {
+        const cls = l.actionType === 'Heal' ? 'heal' : (l.actorSide === 'Hero' ? 'hero' : 'enemy');
+        const verb = l.actionType === 'Heal' ? `hồi <strong style="color:var(--stamina)">+${l.amount} HP</strong> cho` : `gây <strong style="color:var(--danger)">-${l.amount} DMG</strong> lên`;
+        const ko = l.targetDefeated ? ' 💀 <strong>HẠ GỤC!</strong>' : ` (HP còn ${l.targetHpAfter}/${l.targetMaxHp})`;
+        return `
+          <div class="turn-row ${cls}">
+            <span class="muted">[Lượt ${l.round}]</span>
+            <strong>${escapeHtml(l.actorName)}</strong> dùng <code>${escapeHtml(l.skillId)}.lua</code>
+            (<em>${escapeHtml(l.skillLabel)}</em>) → ${verb} <strong>${escapeHtml(l.targetName)}</strong>${ko}
+          </div>`;
+      }).join('');
+
+      panel.innerHTML = `
+        <div class="battle-banner ${res.isVictory ? 'win' : 'lose'}">
+          <div>
+            <h3 style="font-size:18px; margin-bottom:4px;">
+              ${res.isVictory ? '🏆 CHIẾN THẮNG' : '💀 THẤT BẠI'} — ${escapeHtml(res.stageName)}
+            </h3>
+            <div class="muted">Số lượt: ${res.totalRounds} • Seed tất định: <code>${res.randomSeed}</code></div>
+          </div>
+          ${rewardsHtml}
+        </div>
+        <div class="section-title">📜 Nhật ký chiến đấu (Thực thi bằng Lua MoonSharp Sandbox)</div>
+        <div class="combat-log-list">${logsHtml}</div>
+      `;
+
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // --- Tab 2: My Heroes ---
     function renderHeroes() {
       const grid = document.getElementById('heroesGrid');
-      if (!masterData?.heroes) return;
+      if (!myHeroes.length) {
+        grid.innerHTML = '<div class="muted">Chưa có Hero nào.</div>';
+        return;
+      }
 
-      grid.innerHTML = masterData.heroes.map(h => `
-        <div class="game-card">
-          <div>
-            <div class="row" style="justify-content:space-between; margin-bottom:6px;">
-              <strong>${escapeHtml(h.name)}</strong>
-              <span class="badge badge-${escapeHtml(h.element)}">${escapeHtml(h.element)}</span>
+      grid.innerHTML = myHeroes.map(h => {
+        const gearHtml = h.equippedGear.length
+          ? h.equippedGear.map(g => `<span class="badge badge-gold">🗡️ ${escapeHtml(g.name)} +${g.enhanceLevel}</span>`).join(' ')
+          : '<span class="muted" style="font-size:12px;">Chưa mặc trang bị</span>';
+
+        return `
+          <div class="game-card">
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                <strong>${escapeHtml(h.name)}</strong>
+                <span class="badge badge-${escapeHtml(h.element)}">${escapeHtml(h.element)}</span>
+              </div>
+              <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+                <span style="color:var(--gold); font-size:13px;">${'★'.repeat(h.rarity)} • Lv.${h.level}</span>
+                ${h.teamSlot ? `<span class="badge badge-ok">Đội hình Slot ${h.teamSlot}</span>` : '<span class="badge">Dự bị</span>'}
+              </div>
+              <div class="stats-grid" style="margin-bottom:10px;">
+                <div class="stat-box"><span class="k">HP</span><span class="v">${h.maxHp}</span></div>
+                <div class="stat-box"><span class="k">ATK</span><span class="v">${h.atk}</span></div>
+                <div class="stat-box"><span class="k">DEF</span><span class="v">${h.def}</span></div>
+                <div class="stat-box"><span class="k">SPD</span><span class="v">${h.speed}</span></div>
+              </div>
+              <div class="row" style="margin-bottom:8px;">${gearHtml}</div>
+              <div class="muted" style="font-size:12px;">Lua Skills: ${h.skillIds.map(s => `<code>${escapeHtml(s)}</code>`).join(', ')}</div>
             </div>
-            <div style="color:var(--gold); font-size:13px; margin-bottom:12px;">${'★'.repeat(h.rarity)}</div>
-            <div class="stats-grid">
-              <div class="stat-box"><span class="k">HP</span><span class="v">${h.baseHp}</span></div>
-              <div class="stat-box"><span class="k">ATK</span><span class="v">${h.baseAtk}</span></div>
-              <div class="stat-box"><span class="k">DEF</span><span class="v">${h.baseDef}</span></div>
-              <div class="stat-box"><span class="k">SPD</span><span class="v">${h.baseSpeed}</span></div>
-            </div>
-          </div>
-          <div class="muted" style="font-size:12px;">Skills: ${h.skillIds.map(escapeHtml).join(' • ')}</div>
-        </div>
-      `).join('');
+            <button class="btn-emerald" onclick="levelUpHero('${h.heroId}')">
+              ⬆️ Lên Lv.${h.level + 1} (${h.nextLevelPotionCost} Bình EXP + ${h.nextLevelGoldCost} 🪙)
+            </button>
+          </div>`;
+      }).join('');
     }
 
-    async function spendStamina(amount, reason = 'ManualTest') {
+    async function levelUpHero(heroId) {
       try {
-        const profile = await apiFetch('POST', '/api/player/stamina/spend', { amount, reason });
-        renderProfile(profile);
-        showToast(`Đã tiêu hao ${amount} thể lực (${reason}).`, 'ok');
-      } catch { /* toast already shown */ }
+        const updatedHero = await apiFetch('POST', `/api/heroes/${heroId}/level-up`);
+        showToast(`${updatedHero.name} đã lên Lv.${updatedHero.level}!`, 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
     }
 
-    function spendCustomStamina() {
-      const amount = parseInt(document.getElementById('customSpendAmount').value, 10) || 10;
-      spendStamina(amount, 'ManualTest');
+    // --- Tab 3: Inventory & Equipment ---
+    function renderInventory() {
+      const matGrid = document.getElementById('materialsGrid');
+      const eqGrid = document.getElementById('equipmentsGrid');
+      if (!myInventory) return;
+
+      matGrid.innerHTML = myInventory.materials.length
+        ? myInventory.materials.map(m => `
+            <div class="game-card" style="padding:14px;">
+              <div class="row" style="justify-content:space-between;">
+                <strong>${escapeHtml(m.name)}</strong>
+                <span class="badge badge-ok">x${m.quantity}</span>
+              </div>
+              <p class="muted" style="font-size:12px;">${escapeHtml(m.description)}</p>
+            </div>`).join('')
+        : '<div class="muted">Túi nguyên liệu đang trống. Hãy đi ải để farm thêm!</div>';
+
+      const heroOptions = myHeroes.map(h => `<option value="${h.heroId}">${escapeHtml(h.name)} (Lv.${h.level})</option>`).join('');
+
+      eqGrid.innerHTML = myInventory.equipments.length
+        ? myInventory.equipments.map(e => {
+            const owner = myHeroes.find(h => h.heroId === e.equippedHeroId);
+            return `
+              <div class="game-card">
+                <div>
+                  <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                    <strong>${escapeHtml(e.name)} <span style="color:var(--gold)">+${e.enhanceLevel}</span></strong>
+                    <span class="badge badge-info">${escapeHtml(e.slot)}</span>
+                  </div>
+                  <div class="row" style="margin-bottom:10px; font-size:12px;">
+                    <span class="badge">ATK +${e.bonusAtk}</span>
+                    <span class="badge">HP +${e.bonusHp}</span>
+                    <span class="badge">DEF +${e.bonusDef}</span>
+                  </div>
+                  <div class="muted" style="font-size:12px; margin-bottom:10px;">
+                    ${owner ? `✅ Đang trang bị cho <strong>${escapeHtml(owner.name)}</strong>` : 'Chưa trang bị'}
+                  </div>
+                </div>
+                <div class="row">
+                  <select id="equip-select-${e.equipmentId}" style="flex:1;">
+                    <option value="">-- Tháo trang bị --</option>
+                    ${myHeroes.map(h => `<option value="${h.heroId}" ${h.heroId === e.equippedHeroId ? 'selected' : ''}>${escapeHtml(h.name)}</option>`).join('')}
+                  </select>
+                  <button class="btn-ghost" onclick="equipItem('${e.equipmentId}')">Lưu</button>
+                </div>
+                <button class="btn-gold" onclick="enhanceEquipment('${e.equipmentId}')">
+                  🔨 Cường hóa +${e.enhanceLevel + 1} (${e.nextEnhanceStoneCost} Đá + ${e.nextEnhanceGoldCost} 🪙)
+                </button>
+              </div>`;
+          }).join('')
+        : '<div class="muted">Chưa có trang bị nào. Đánh ải để nhặt trang bị!</div>';
     }
 
+    async function equipItem(equipmentId) {
+      const sel = document.getElementById(`equip-select-${equipmentId}`);
+      const heroId = sel.value || null;
+      try {
+        await apiFetch('POST', `/api/inventory/equipment/${equipmentId}/equip`, { heroId });
+        showToast(heroId ? 'Đã trang bị cho Hero!' : 'Đã tháo trang bị.', 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    async function enhanceEquipment(equipmentId) {
+      try {
+        const res = await apiFetch('POST', `/api/inventory/equipment/${equipmentId}/enhance`);
+        showToast(`Cường hóa thành công ${res.name} lên +${res.enhanceLevel}!`, 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    // --- Tab 4: Lua Scripts ---
+    async function loadLuaScripts() {
+      try {
+        const scripts = await apiFetch('GET', '/api/battle/scripts', null, false);
+        const grid = document.getElementById('luaScriptsGrid');
+        grid.innerHTML = scripts.map(s => `
+          <div class="game-card" style="background:#0d1117;">
+            <div class="row" style="justify-content:space-between;">
+              <strong>🌙 ${escapeHtml(s.skillId)}.lua</strong>
+              <span class="badge badge-info">MoonSharp Sandbox</span>
+            </div>
+            <pre style="font-size:12px; margin-top:8px;">${escapeHtml(s.source)}</pre>
+          </div>
+        `).join('');
+      } catch { /* ignore */ }
+    }
+
+    // --- Tab 5: Ledger & Stamina Refill ---
     async function refillStamina() {
       try {
         const profile = await apiFetch('POST', '/api/player/stamina/refill');
         renderProfile(profile);
         showToast('Nạp thành công +60 thể lực (-50 Gems)!', 'ok');
         await loadLedger();
-      } catch { /* toast already shown */ }
+      } catch { /* handled */ }
     }
 
     async function loadLedger() {
@@ -616,7 +798,7 @@
         const items = await apiFetch('GET', '/api/player/ledger?limit=30');
         const tbody = document.getElementById('ledgerBody');
         if (!items.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="muted">Chưa có giao dịch nào.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="muted">Chưa có giao dịch nào.</td></tr>';
           return;
         }
         tbody.innerHTML = items.map(x => `
@@ -626,6 +808,7 @@
             <td class="${x.delta >= 0 ? 'delta-pos' : 'delta-neg'}">${x.delta >= 0 ? '+' : ''}${x.delta.toLocaleString()}</td>
             <td>${x.balanceAfter.toLocaleString()}</td>
             <td><span class="badge badge-info">${escapeHtml(x.reason)}</span></td>
+            <td class="muted">${escapeHtml(x.referenceId || '-')}</td>
             <td class="muted">${new Date(x.createdAtUtc).toLocaleString()}</td>
           </tr>
         `).join('');
@@ -634,13 +817,13 @@
 
     function switchTab(tab) {
       document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-      ['stages', 'heroes', 'ledger'].forEach(t => {
+      ['stages', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
         document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
       });
       if (tab === 'ledger') loadLedger();
+      if (tab === 'lua') loadLuaScripts();
     }
 
-    // Auto-login if token exists
     (async () => {
       if (localStorage.getItem(TOKEN_KEY)) {
         await enterGame();

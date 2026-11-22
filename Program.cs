@@ -4,6 +4,10 @@ using LearnBackend.Common.Middleware;
 using LearnBackend.Infrastructure.Persistence;
 using LearnBackend.Infrastructure.Security;
 using LearnBackend.Modules.Auth;
+using LearnBackend.Modules.Battle;
+using LearnBackend.Modules.Battle.Engine;
+using LearnBackend.Modules.Hero;
+using LearnBackend.Modules.Inventory;
 using LearnBackend.Modules.MasterData;
 using LearnBackend.Modules.Player;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -47,23 +51,43 @@ builder.Services.AddSingleton<IPlayerLockManager, InMemoryPlayerLockManager>();
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<JwtTokenGenerator>();
 
-// 4. Game Modules
+// 4. Combat Engine + Sandboxed Lua Skill Runner (MoonSharp)
+builder.Services.AddSingleton<LuaSkillRunner>();
+builder.Services.AddSingleton<TurnBasedCombatEngine>();
+
+// 5. Game Modules
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<PlayerService>();
+builder.Services.AddScoped<HeroService>();
+builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<BattleService>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Tự động tạo file SQLite & các bảng nếu chưa tồn tại (tiện cho giai đoạn dev)
+// Tự động tạo file SQLite & nâng cấp schema dev nếu DB cũ từ Chặng 1 chưa có bảng mới của Chặng 2
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GameDbContext>();
     db.Database.EnsureCreated();
+
+    var conn = db.Database.GetDbConnection();
+    conn.Open();
+    using var cmd = conn.CreateCommand();
+    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='PlayerHeroes';";
+    var hasStage2Tables = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    conn.Close();
+
+    if (!hasStage2Tables)
+    {
+        db.Database.EnsureDeleted();
+        db.Database.EnsureCreated();
+    }
 }
 
-// 5. HTTP Pipeline (Thứ tự middleware cực kỳ quan trọng!)
+// 6. HTTP Pipeline (Thứ tự middleware cực kỳ quan trọng!)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())

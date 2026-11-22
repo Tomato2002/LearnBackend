@@ -4,6 +4,8 @@ using LearnBackend.Infrastructure.Persistence;
 using LearnBackend.Infrastructure.Security;
 using LearnBackend.Modules.Auth.DTOs;
 using LearnBackend.Modules.Auth.Entities;
+using LearnBackend.Modules.Hero.Entities;
+using LearnBackend.Modules.Inventory.Entities;
 using LearnBackend.Modules.MasterData;
 using LearnBackend.Modules.Player.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -88,6 +90,56 @@ public sealed class AuthService(
                 Reason = "StarterBonus",
                 CreatedAtUtc = nowUtc
             });
+
+        // Tặng đội hình tân thủ (3 Hero ra trận) + nguyên liệu + 1 vũ khí mẫu để test ngay
+        db.PlayerHeroes.AddRange(
+            new PlayerHero
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                HeroTemplateId = "hero_arthur",
+                Level = 1,
+                TeamSlot = 1,
+                AcquiredAtUtc = nowUtc
+            },
+            new PlayerHero
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                HeroTemplateId = "hero_lyra",
+                Level = 1,
+                TeamSlot = 2,
+                AcquiredAtUtc = nowUtc
+            },
+            new PlayerHero
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                HeroTemplateId = "hero_ignis",
+                Level = 1,
+                TeamSlot = 3,
+                AcquiredAtUtc = nowUtc
+            });
+
+        db.InventoryItems.AddRange(
+            new InventoryItem { PlayerId = player.Id, ItemId = "potion_exp_small", Quantity = 5 },
+            new InventoryItem { PlayerId = player.Id, ItemId = "stone_enhance", Quantity = 5 });
+
+        if (masterData.Items.TryGetValue("sword_iron", out var starterSword))
+        {
+            db.Equipments.Add(new EquipmentInstance
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                TemplateId = starterSword.Id,
+                EnhanceLevel = 0,
+                BonusAtk = starterSword.BaseAtkBonus,
+                BonusHp = starterSword.BaseHpBonus,
+                BonusDef = starterSword.BaseDefBonus,
+                EquippedHeroId = null,
+                CreatedAtUtc = nowUtc
+            });
+        }
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

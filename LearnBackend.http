@@ -1,9 +1,12 @@
 @baseUrl = http://localhost:5098
 
-### 1. Tải toàn bộ Master Data (Config tĩnh từ RAM)
+### 1. Tải toàn bộ Master Data (Heroes, Enemies, Items, Stages, GameRules)
 GET {{baseUrl}}/api/master-data
 
-### 2. Đăng ký tài khoản mới
+### 2. Xem các file Lua Skill đang nạp trong MoonSharp Sandbox
+GET {{baseUrl}}/api/battle/scripts
+
+### 3. Đăng ký tài khoản mới (tự tặng 3 Hero, nguyên liệu và Kiếm Thép)
 # @name register
 POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
@@ -14,7 +17,7 @@ Content-Type: application/json
   "nickname": "KingArthur"
 }
 
-### 3. Đăng nhập (lấy JWT token)
+### 4. Đăng nhập (lấy JWT token)
 # @name login
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
@@ -26,24 +29,31 @@ Content-Type: application/json
 
 @token = {{login.response.body.accessToken}}
 
-### 4. Lấy thông tin hồ sơ người chơi (kèm Stamina tính theo Lazy Calculation)
+### 5. Lấy hồ sơ người chơi + Lazy Stamina
 GET {{baseUrl}}/api/player/me
 Authorization: Bearer {{token}}
 
-### 5. Test tiêu hao 30 thể lực (để kích hoạt đồng hồ hồi thể lực)
-POST {{baseUrl}}/api/player/stamina/spend
+### 6. Xem đội hình Hero của mình
+GET {{baseUrl}}/api/heroes
+Authorization: Bearer {{token}}
+
+### 7. Xem Túi Đồ & Trang Bị
+GET {{baseUrl}}/api/inventory
+Authorization: Bearer {{token}}
+
+### 8. Đánh Ải 1-1 (Server chạy Turn-Based Combat + Lua Skills, trừ Stamina, cộng Gold/EXP/Loot!)
+POST {{baseUrl}}/api/battle/run
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "amount": 30,
-  "reason": "TestStage"
+  "stageId": "stage_1_1"
 }
 
-### 6. Dùng 50 Gems để mua thêm 60 thể lực (có Transaction + Audit Ledger)
+### 9. Nạp +60 thể lực bằng 50 Gems
 POST {{baseUrl}}/api/player/stamina/refill
 Authorization: Bearer {{token}}
 
-### 7. Xem sổ cái kinh tế (Economy Audit Log)
+### 10. Xem Sổ Cái Kinh Tế (Currency Ledger)
 GET {{baseUrl}}/api/player/ledger?limit=20
 Authorization: Bearer {{token}}

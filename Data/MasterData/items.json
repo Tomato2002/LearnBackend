@@ -1,0 +1,57 @@
+[
+  {
+    "id": "potion_exp_small",
+    "name": "Bình Kinh Nghiệm Nhỏ",
+    "category": "Material",
+    "slot": null,
+    "rarity": 2,
+    "description": "Dùng để nâng cấp Level cho Hero.",
+    "baseAtkBonus": 0,
+    "baseHpBonus": 0,
+    "baseDefBonus": 0
+  },
+  {
+    "id": "stone_enhance",
+    "name": "Đá Cường Hóa",
+    "category": "Material",
+    "slot": null,
+    "rarity": 3,
+    "description": "Nguyên liệu cường hóa trang bị (+1 cấp).",
+    "baseAtkBonus": 0,
+    "baseHpBonus": 0,
+    "baseDefBonus": 0
+  },
+  {
+    "id": "sword_iron",
+    "name": "Kiếm Thép Hiệp Sĩ",
+    "category": "Equipment",
+    "slot": "Weapon",
+    "rarity": 3,
+    "description": "Tăng mạnh chỉ số ATK cho Hero.",
+    "baseAtkBonus": 35,
+    "baseHpBonus": 50,
+    "baseDefBonus": 5
+  },
+  {
+    "id": "armor_knight",
+    "name": "Giáp Bạc Hoàng Gia",
+    "category": "Equipment",
+    "slot": "Armor",
+    "rarity": 4,
+    "description": "Tăng HP và DEF cho tướng tuyến trước.",
+    "baseAtkBonus": 5,
+    "baseHpBonus": 240,
+    "baseDefBonus": 30
+  },
+  {
+    "id": "ring_flame",
+    "name": "Nhẫn Lửa Phượng Hoàng",
+    "category": "Equipment",
+    "slot": "Accessory",
+    "rarity": 5,
+    "description": "Trang sức hiếm tăng toàn diện ATK và HP.",
+    "baseAtkBonus": 55,
+    "baseHpBonus": 180,
+    "baseDefBonus": 15
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "goblin_scout",
+    "name": "Goblin Trinh Sát",
+    "element": "Earth",
+    "hp": 420,
+    "atk": 72,
+    "def": 30,
+    "speed": 92,
+    "skillIds": ["enemy_bite"]
+  },
+  {
+    "id": "forest_wolf",
+    "name": "Sói Rừng Hoang",
+    "element": "Wind",
+    "hp": 620,
+    "atk": 98,
+    "def": 42,
+    "speed": 108,
+    "skillIds": ["enemy_bite"]
+  },
+  {
+    "id": "alpha_wolf",
+    "name": "Sói Đầu Đàn",
+    "element": "Wind",
+    "hp": 920,
+    "atk": 122,
+    "def": 55,
+    "speed": 115,
+    "skillIds": ["enemy_bite"]
+  },
+  {
+    "id": "fire_dragon_boss",
+    "name": "Trùm Rồng Lửa (Boss)",
+    "element": "Fire",
+    "hp": 2600,
+    "atk": 175,
+    "def": 88,
+    "speed": 102,
+    "skillIds": ["enemy_bite", "skill_fireball"]
+  }
+]

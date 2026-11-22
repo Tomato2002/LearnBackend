@@ -5,7 +5,7 @@ using LearnBackend.Modules.MasterData.Models;
 namespace LearnBackend.Modules.MasterData;
 
 /// <summary>
-/// Singleton giữ toàn bộ dữ liệu tĩnh của game (Config Hero, Stage, Luật game...) trên RAM.
+/// Singleton giữ toàn bộ dữ liệu tĩnh của game (Config Hero, Enemy, Item, Stage, Luật game...) trên RAM.
 /// Dùng FrozenDictionary để đọc cực nhanh O(1), không bao giờ phải query DB cho dữ liệu tĩnh.
 /// </summary>
 public sealed class MasterDataStore
@@ -17,6 +17,8 @@ public sealed class MasterDataStore
 
     public GameRulesConfig GameRules { get; }
     public FrozenDictionary<string, HeroConfig> Heroes { get; }
+    public FrozenDictionary<string, EnemyConfig> Enemies { get; }
+    public FrozenDictionary<string, ItemConfig> Items { get; }
     public FrozenDictionary<string, StageConfig> Stages { get; }
 
     public MasterDataStore(IWebHostEnvironment env)
@@ -27,6 +29,12 @@ public sealed class MasterDataStore
 
         var heroes = LoadJson<List<HeroConfig>>(Path.Combine(baseDir, "heroes.json"));
         Heroes = heroes.ToFrozenDictionary(h => h.Id, StringComparer.OrdinalIgnoreCase);
+
+        var enemies = LoadJson<List<EnemyConfig>>(Path.Combine(baseDir, "enemies.json"));
+        Enemies = enemies.ToFrozenDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
+
+        var items = LoadJson<List<ItemConfig>>(Path.Combine(baseDir, "items.json"));
+        Items = items.ToFrozenDictionary(i => i.Id, StringComparer.OrdinalIgnoreCase);
 
         var stages = LoadJson<List<StageConfig>>(Path.Combine(baseDir, "stages.json"));
         Stages = stages.ToFrozenDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
