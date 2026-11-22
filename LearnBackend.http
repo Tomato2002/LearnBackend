@@ -27,7 +27,7 @@ Content-Type: application/json
   "password": "Password123!"
 }
 
-@token = {{login.response.body.accessToken}}
+@token = {{login.response.body.data.accessToken}}
 
 ### 5. Lấy hồ sơ người chơi + Lazy Stamina
 GET {{baseUrl}}/api/player/me
@@ -67,6 +67,6 @@ POST {{baseUrl}}/api/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "{{login.response.body.refreshToken}}"
+  "refreshToken": "{{login.response.body.data.refreshToken}}"
 }
 

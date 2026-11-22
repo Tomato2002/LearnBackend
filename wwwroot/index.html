@@ -404,14 +404,15 @@
         throw new Error('UNAUTHORIZED');
       }
 
-      if (!res.ok) {
+      if (!res.ok || (data && typeof data === 'object' && data.success === false)) {
         const msg = data?.message || data?.title || `HTTP ${res.status}`;
         const code = data?.errorCode ? `[${data.errorCode}] ` : '';
         showToast(`${code}${msg}`, 'err');
         throw new Error(msg);
       }
 
-      return data;
+      // Tự động mở gói Common DTO ApiResponse<T> -> trả về trường data
+      return (data && typeof data === 'object' && 'data' in data) ? data.data : data;
     }
 
     async function tryRefreshToken() {
@@ -424,9 +425,11 @@
           body: JSON.stringify({ refreshToken })
         });
         if (!res.ok) return false;
-        const data = await res.json();
-        localStorage.setItem(TOKEN_KEY, data.accessToken);
-        localStorage.setItem(REFRESH_KEY, data.refreshToken);
+        const envelope = await res.json();
+        const payload = envelope?.data ?? envelope;
+        if (!payload?.accessToken) return false;
+        localStorage.setItem(TOKEN_KEY, payload.accessToken);
+        localStorage.setItem(REFRESH_KEY, payload.refreshToken);
         return true;
       } catch {
         return false;

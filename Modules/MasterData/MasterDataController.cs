@@ -1,3 +1,4 @@
+using LearnBackend.Common.DTOs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LearnBackend.Modules.MasterData;
@@ -12,25 +13,25 @@ public sealed class MasterDataController(MasterDataStore masterData) : Controlle
     [HttpGet]
     public IActionResult GetAll()
     {
-        return Ok(new
+        return Ok(ApiResponse.Ok(new
         {
             gameRules = masterData.GameRules,
             heroes = masterData.Heroes.Values,
             enemies = masterData.Enemies.Values,
             items = masterData.Items.Values,
             stages = masterData.Stages.Values
-        });
+        }));
     }
 
     [HttpGet("heroes")]
-    public IActionResult GetHeroes() => Ok(masterData.Heroes.Values);
+    public IActionResult GetHeroes() => Ok(ApiResponse.Ok(masterData.Heroes.Values));
 
     [HttpGet("enemies")]
-    public IActionResult GetEnemies() => Ok(masterData.Enemies.Values);
+    public IActionResult GetEnemies() => Ok(ApiResponse.Ok(masterData.Enemies.Values));
 
     [HttpGet("items")]
-    public IActionResult GetItems() => Ok(masterData.Items.Values);
+    public IActionResult GetItems() => Ok(ApiResponse.Ok(masterData.Items.Values));
 
     [HttpGet("stages")]
-    public IActionResult GetStages() => Ok(masterData.Stages.Values);
+    public IActionResult GetStages() => Ok(ApiResponse.Ok(masterData.Stages.Values));
 }

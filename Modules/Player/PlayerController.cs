@@ -1,3 +1,4 @@
+using LearnBackend.Common.DTOs;
 using LearnBackend.Common.Extensions;
 using LearnBackend.Modules.Player.DTOs;
 using Microsoft.AspNetCore.Authorization;
@@ -11,34 +12,34 @@ namespace LearnBackend.Modules.Player;
 public sealed class PlayerController(PlayerService playerService) : ControllerBase
 {
     [HttpGet("me")]
-    public async Task<ActionResult<PlayerProfileResponse>> GetMe(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PlayerProfileResponse>>> GetMe(CancellationToken ct)
     {
         var playerId = User.GetPlayerId();
         var profile = await playerService.GetProfileAsync(playerId, ct);
-        return Ok(profile);
+        return Ok(ApiResponse.Ok(profile));
     }
 
     [HttpPost("stamina/refill")]
-    public async Task<ActionResult<PlayerProfileResponse>> RefillStamina(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PlayerProfileResponse>>> RefillStamina(CancellationToken ct)
     {
         var playerId = User.GetPlayerId();
         var profile = await playerService.RefillStaminaAsync(playerId, ct);
-        return Ok(profile);
+        return Ok(ApiResponse.Ok(profile));
     }
 
     [HttpPost("stamina/spend")]
-    public async Task<ActionResult<PlayerProfileResponse>> SpendStamina(SpendStaminaRequest request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PlayerProfileResponse>>> SpendStamina(SpendStaminaRequest request, CancellationToken ct)
     {
         var playerId = User.GetPlayerId();
         var profile = await playerService.SpendStaminaAsync(playerId, request.Amount, ct);
-        return Ok(profile);
+        return Ok(ApiResponse.Ok(profile));
     }
 
     [HttpGet("ledger")]
-    public async Task<ActionResult<List<CurrencyLedgerDto>>> GetLedger([FromQuery] int limit = 20, CancellationToken ct = default)
+    public async Task<ActionResult<ApiResponse<List<CurrencyLedgerDto>>>> GetLedger([FromQuery] int limit = 20, CancellationToken ct = default)
     {
         var playerId = User.GetPlayerId();
         var ledger = await playerService.GetCurrencyLedgerAsync(playerId, limit, ct);
-        return Ok(ledger);
+        return Ok(ApiResponse.Ok(ledger));
     }
 }

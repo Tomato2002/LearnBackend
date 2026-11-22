@@ -1,11 +1,12 @@
 using System.Net;
 using System.Text.Json;
+using LearnBackend.Common.DTOs;
 using LearnBackend.Common.Exceptions;
 
 namespace LearnBackend.Common.Middleware;
 
 /// <summary>
-/// Bắt tập trung mọi Exception trong pipeline để trả về format JSON thống nhất cho Unity Client.
+/// Bắt tập trung mọi Exception trong pipeline để trả về chuẩn ApiResponse thống nhất cho Unity Client.
 /// </summary>
 public sealed class ExceptionHandlingMiddleware(
     RequestDelegate next,
@@ -47,14 +48,7 @@ public sealed class ExceptionHandlingMiddleware(
         context.Response.StatusCode = (int)statusCode;
         context.Response.ContentType = "application/json";
 
-        var payload = new
-        {
-            success = false,
-            errorCode,
-            message,
-            serverTimeUtc = DateTime.UtcNow
-        };
-
+        var payload = ApiResponse.Fail(errorCode, message);
         await context.Response.WriteAsync(JsonSerializer.Serialize(payload, JsonOptions));
     }
 }

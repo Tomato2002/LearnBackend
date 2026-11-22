@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
+using LearnBackend.Common.DTOs;
 using LearnBackend.Common.Idempotency;
 using LearnBackend.Common.Locking;
 using LearnBackend.Common.Middleware;
@@ -64,13 +65,9 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, ct) =>
     {
         context.HttpContext.Response.ContentType = "application/json";
-        var payload = JsonSerializer.Serialize(new
-        {
-            success = false,
-            errorCode = "RATE_LIMITED",
-            message = "Bạn gửi yêu cầu quá nhanh, vui lòng thử lại sau giây lát.",
-            serverTimeUtc = DateTime.UtcNow
-        });
+        var payload = JsonSerializer.Serialize(
+            ApiResponse.Fail("RATE_LIMITED", "Bạn gửi yêu cầu quá nhanh, vui lòng thử lại sau giây lát."),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         await context.HttpContext.Response.WriteAsync(payload, ct);
     };
 
