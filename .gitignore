@@ -69,3 +69,8 @@ x86/
 
 # Publish Web Output
 *.[Pp]ublish.xml
+
+# SQLite local database
+*.db
+*.db-shm
+*.db-wal

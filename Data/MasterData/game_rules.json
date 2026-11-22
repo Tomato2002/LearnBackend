@@ -1,0 +1,10 @@
+{
+  "starterGold": 1000,
+  "starterGems": 300,
+  "baseMaxStamina": 100,
+  "staminaPerLevel": 5,
+  "staminaRegenIntervalSeconds": 300,
+  "staminaRefillGemCost": 50,
+  "staminaRefillAmount": 60,
+  "baseExpPerLevel": 100
+}

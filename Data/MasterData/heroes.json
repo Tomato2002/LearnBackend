@@ -1,0 +1,35 @@
+[
+  {
+    "id": "hero_arthur",
+    "name": "Arthur - Hiệp Sĩ Ánh Sáng",
+    "element": "Light",
+    "rarity": 4,
+    "baseHp": 1200,
+    "baseAtk": 140,
+    "baseDef": 110,
+    "baseSpeed": 105,
+    "skillIds": ["skill_slash", "skill_holy_shield"]
+  },
+  {
+    "id": "hero_ignis",
+    "name": "Ignis - Phượng Hoàng Lửa",
+    "element": "Fire",
+    "rarity": 5,
+    "baseHp": 980,
+    "baseAtk": 195,
+    "baseDef": 75,
+    "baseSpeed": 118,
+    "skillIds": ["skill_fireball", "skill_phoenix_rebirth"]
+  },
+  {
+    "id": "hero_lyra",
+    "name": "Lyra - Tư Tế Thủy Triều",
+    "element": "Water",
+    "rarity": 4,
+    "baseHp": 1050,
+    "baseAtk": 120,
+    "baseDef": 90,
+    "baseSpeed": 112,
+    "skillIds": ["skill_water_bolt", "skill_healing_wave"]
+  }
+]

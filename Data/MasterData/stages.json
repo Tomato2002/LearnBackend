@@ -1,0 +1,29 @@
+[
+  {
+    "id": "stage_1_1",
+    "name": "1-1: Rừng Goblin",
+    "staminaCost": 6,
+    "recommendedLevel": 1,
+    "expReward": 50,
+    "goldReward": 120,
+    "enemyIds": ["goblin_scout", "goblin_scout"]
+  },
+  {
+    "id": "stage_1_2",
+    "name": "1-2: Hang Sói Hoang",
+    "staminaCost": 8,
+    "recommendedLevel": 2,
+    "expReward": 95,
+    "goldReward": 220,
+    "enemyIds": ["forest_wolf", "forest_wolf", "alpha_wolf"]
+  },
+  {
+    "id": "stage_1_boss",
+    "name": "1-Boss: Hang Ổ Rồng Lửa",
+    "staminaCost": 15,
+    "recommendedLevel": 5,
+    "expReward": 320,
+    "goldReward": 800,
+    "enemyIds": ["fire_dragon_boss"]
+  }
+]
