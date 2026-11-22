@@ -7,5 +7,6 @@ public sealed class JwtOptions
     public string Issuer { get; init; } = "LearnBackend.GameServer";
     public string Audience { get; init; } = "LearnBackend.UnityClient";
     public string SecretKey { get; init; } = string.Empty;
-    public int AccessTokenExpirationMinutes { get; init; } = 120;
+    public int AccessTokenExpirationMinutes { get; init; } = 30;
+    public int RefreshTokenExpirationDays { get; init; } = 14;
 }

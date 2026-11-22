@@ -9,6 +9,7 @@ namespace LearnBackend.Infrastructure.Persistence;
 public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbContext(options)
 {
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<PlayerProfile> Players => Set<PlayerProfile>();
     public DbSet<CurrencyLedger> CurrencyLedgers => Set<CurrencyLedger>();
     public DbSet<PlayerHero> PlayerHeroes => Set<PlayerHero>();
@@ -26,6 +27,15 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             entity.Property(x => x.NormalizedUsername).HasMaxLength(32).IsRequired();
             entity.Property(x => x.PasswordHash).HasMaxLength(256).IsRequired();
             entity.HasIndex(x => x.NormalizedUsername).IsUnique();
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TokenHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.ReplacedByTokenHash).HasMaxLength(128);
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => x.UserAccountId);
         });
 
         modelBuilder.Entity<PlayerProfile>(entity =>

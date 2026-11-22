@@ -50,10 +50,23 @@ Content-Type: application/json
   "stageId": "stage_1_1"
 }
 
-### 9. Nạp +60 thể lực bằng 50 Gems
+### 9. Nạp +60 thể lực bằng 50 Gems (kèm X-Idempotency-Key chống trừ tiền 2 lần khi bấm đúp!)
 POST {{baseUrl}}/api/player/stamina/refill
 Authorization: Bearer {{token}}
+X-Idempotency-Key: refill-demo-key-001
 
 ### 10. Xem Sổ Cái Kinh Tế (Currency Ledger)
 GET {{baseUrl}}/api/player/ledger?limit=20
 Authorization: Bearer {{token}}
+
+### 11. Kiểm tra sức khỏe hệ thống + kết nối DB (Health Check)
+GET {{baseUrl}}/health
+
+### 12. Gia hạn Access Token bằng Refresh Token (Rotation)
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.refreshToken}}"
+}
+

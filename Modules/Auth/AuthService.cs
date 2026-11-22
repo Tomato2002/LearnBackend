@@ -41,7 +41,6 @@ public sealed class AuthService(
         var nowUtc = DateTime.UtcNow;
         var rules = masterData.GameRules;
 
-        // Tạo UserAccount + PlayerProfile + Ledger quà tân thủ trong CÙNG 1 Transaction (ACID)
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         var account = new UserAccount
@@ -91,7 +90,7 @@ public sealed class AuthService(
                 CreatedAtUtc = nowUtc
             });
 
-        // Tặng đội hình tân thủ (3 Hero ra trận) + nguyên liệu + 1 vũ khí mẫu để test ngay
+        // Tặng đội hình tân thủ (3 Hero ra trận) + nguyên liệu + 1 vũ khí mẫu
         db.PlayerHeroes.AddRange(
             new PlayerHero
             {
@@ -141,11 +140,21 @@ public sealed class AuthService(
             });
         }
 
+        var (rawRefresh, refreshHash, refreshExpiresAtUtc) = jwtTokenGenerator.GenerateRefreshToken();
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserAccountId = account.Id,
+            TokenHash = refreshHash,
+            CreatedAtUtc = nowUtc,
+            ExpiresAtUtc = refreshExpiresAtUtc
+        });
+
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        var (token, expiresAtUtc) = jwtTokenGenerator.GenerateAccessToken(account.Id, player.Id, account.Username);
-        return new AuthResponse(token, expiresAtUtc, player.Id, player.Nickname);
+        var (accessToken, accessExpiresAtUtc) = jwtTokenGenerator.GenerateAccessToken(account.Id, player.Id, account.Username);
+        return new AuthResponse(accessToken, accessExpiresAtUtc, rawRefresh, refreshExpiresAtUtc, player.Id, player.Nickname);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -167,10 +176,85 @@ public sealed class AuthService(
             .FirstOrDefaultAsync(p => p.UserAccountId == account.Id, ct)
             ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy hồ sơ người chơi.", HttpStatusCode.NotFound);
 
-        account.LastLoginAtUtc = DateTime.UtcNow;
+        var nowUtc = DateTime.UtcNow;
+        account.LastLoginAtUtc = nowUtc;
+
+        var (rawRefresh, refreshHash, refreshExpiresAtUtc) = jwtTokenGenerator.GenerateRefreshToken();
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserAccountId = account.Id,
+            TokenHash = refreshHash,
+            CreatedAtUtc = nowUtc,
+            ExpiresAtUtc = refreshExpiresAtUtc
+        });
+
         await db.SaveChangesAsync(ct);
 
-        var (token, expiresAtUtc) = jwtTokenGenerator.GenerateAccessToken(account.Id, player.Id, account.Username);
-        return new AuthResponse(token, expiresAtUtc, player.Id, player.Nickname);
+        var (accessToken, accessExpiresAtUtc) = jwtTokenGenerator.GenerateAccessToken(account.Id, player.Id, account.Username);
+        return new AuthResponse(accessToken, accessExpiresAtUtc, rawRefresh, refreshExpiresAtUtc, player.Id, player.Nickname);
+    }
+
+    /// <summary>
+    /// Refresh Token Rotation: đổi Refresh Token cũ lấy cặp (AccessToken + RefreshToken) mới và vô hiệu hóa token cũ.
+    /// </summary>
+    public async Task<AuthResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken ct)
+    {
+        var tokenHash = JwtTokenGenerator.HashToken(request.RefreshToken.Trim());
+        var existing = await db.RefreshTokens
+            .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, ct);
+
+        if (existing is null || !existing.IsActive)
+        {
+            throw new GameException(
+                "INVALID_REFRESH_TOKEN",
+                "Refresh token không hợp lệ, đã hết hạn hoặc đã bị thu hồi.",
+                HttpStatusCode.Unauthorized);
+        }
+
+        var account = await db.UserAccounts
+            .FirstOrDefaultAsync(u => u.Id == existing.UserAccountId, ct)
+            ?? throw new GameException("ACCOUNT_NOT_FOUND", "Tài khoản không tồn tại.", HttpStatusCode.Unauthorized);
+
+        var player = await db.Players
+            .FirstOrDefaultAsync(p => p.UserAccountId == account.Id, ct)
+            ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy hồ sơ người chơi.", HttpStatusCode.NotFound);
+
+        var nowUtc = DateTime.UtcNow;
+        var (newRawRefresh, newRefreshHash, newRefreshExpiresAtUtc) = jwtTokenGenerator.GenerateRefreshToken();
+
+        // Thu hồi token cũ và ghi vết token thay thế (Rotation)
+        existing.RevokedAtUtc = nowUtc;
+        existing.ReplacedByTokenHash = newRefreshHash;
+
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserAccountId = account.Id,
+            TokenHash = newRefreshHash,
+            CreatedAtUtc = nowUtc,
+            ExpiresAtUtc = newRefreshExpiresAtUtc
+        });
+
+        await db.SaveChangesAsync(ct);
+
+        var (accessToken, accessExpiresAtUtc) = jwtTokenGenerator.GenerateAccessToken(account.Id, player.Id, account.Username);
+        return new AuthResponse(accessToken, accessExpiresAtUtc, newRawRefresh, newRefreshExpiresAtUtc, player.Id, player.Nickname);
+    }
+
+    /// <summary>
+    /// Thu hồi Refresh Token khi người chơi đăng xuất.
+    /// </summary>
+    public async Task LogoutAsync(RefreshTokenRequest request, CancellationToken ct)
+    {
+        var tokenHash = JwtTokenGenerator.HashToken(request.RefreshToken.Trim());
+        var existing = await db.RefreshTokens
+            .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, ct);
+
+        if (existing is not null && existing.RevokedAtUtc is null)
+        {
+            existing.RevokedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

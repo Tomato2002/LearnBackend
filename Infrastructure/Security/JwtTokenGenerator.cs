@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using LearnBackend.Common.Extensions;
 using Microsoft.Extensions.Options;
@@ -38,5 +39,23 @@ public sealed class JwtTokenGenerator(IOptions<JwtOptions> options)
             signingCredentials: credentials);
 
         return (new JwtSecurityTokenHandler().WriteToken(token), expiresAtUtc);
+    }
+
+    /// <summary>
+    /// Tạo Refresh Token ngẫu nhiên 64 byte (chỉ trả raw token cho client, DB chỉ lưu SHA-256 Hash).
+    /// </summary>
+    public (string RawToken, string TokenHash, DateTime ExpiresAtUtc) GenerateRefreshToken()
+    {
+        var rawBytes = RandomNumberGenerator.GetBytes(64);
+        var rawToken = Convert.ToBase64String(rawBytes);
+        var hash = HashToken(rawToken);
+        var expiresAtUtc = DateTime.UtcNow.AddDays(_options.RefreshTokenExpirationDays);
+        return (rawToken, hash, expiresAtUtc);
+    }
+
+    public static string HashToken(string rawToken)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
+        return Convert.ToHexString(bytes);
     }
 }

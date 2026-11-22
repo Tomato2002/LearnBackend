@@ -359,6 +359,7 @@
 
   <script>
     const TOKEN_KEY = 'rpg_jwt_token';
+    const REFRESH_KEY = 'rpg_refresh_token';
     let authMode = 'login';
     let masterData = null;
     let currentProfile = null;
@@ -367,11 +368,14 @@
     let staminaCountdown = 0;
     let countdownInterval = null;
 
-    async function apiFetch(method, path, body = null, requiresAuth = true) {
+    async function apiFetch(method, path, body = null, requiresAuth = true, customIdempotencyKey = null) {
       const headers = { 'Content-Type': 'application/json' };
       const token = localStorage.getItem(TOKEN_KEY);
       if (requiresAuth && token) {
         headers['Authorization'] = `Bearer ${token}`;
+      }
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+        headers['X-Idempotency-Key'] = customIdempotencyKey || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
       }
 
       const started = performance.now();
@@ -386,9 +390,15 @@
       const text = await res.text();
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-      appendLog(method, path, res.status, ms, data);
+      const replayed = res.headers.get('X-Idempotency-Replayed') === 'true';
+      appendLog(method, replayed ? `${path} (REPLAYED)` : path, res.status, ms, data);
 
       if (res.status === 401 && requiresAuth) {
+        // Tự động thử Refresh Token 1 lần trước khi đá ra màn hình đăng nhập
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+          return apiFetch(method, path, body, requiresAuth, headers['X-Idempotency-Key']);
+        }
         showToast('Phiên đăng nhập hết hạn hoặc chưa có token (401).', 'err');
         logout(false);
         throw new Error('UNAUTHORIZED');
@@ -402,6 +412,25 @@
       }
 
       return data;
+    }
+
+    async function tryRefreshToken() {
+      const refreshToken = localStorage.getItem(REFRESH_KEY);
+      if (!refreshToken) return false;
+      try {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        localStorage.setItem(TOKEN_KEY, data.accessToken);
+        localStorage.setItem(REFRESH_KEY, data.refreshToken);
+        return true;
+      } catch {
+        return false;
+      }
     }
 
     function showToast(message, type = 'ok') {
@@ -469,17 +498,29 @@
         const res = await apiFetch('POST', endpoint, payload, false);
 
         localStorage.setItem(TOKEN_KEY, res.accessToken);
+        if (res.refreshToken) localStorage.setItem(REFRESH_KEY, res.refreshToken);
         showToast(`Chào mừng ${res.nickname}!`, 'ok');
         await enterGame();
       } catch { /* handled */ }
     }
 
-    function logout(notify = true) {
+    async function logout(notify = true) {
+      const refreshToken = localStorage.getItem(REFRESH_KEY);
+      if (refreshToken && notify) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+          });
+        } catch { /* ignore */ }
+      }
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_KEY);
       if (countdownInterval) clearInterval(countdownInterval);
       document.getElementById('gameView').classList.add('hidden');
       document.getElementById('authView').classList.remove('hidden');
-      if (notify) showToast('Đã đăng xuất.', 'ok');
+      if (notify) showToast('Đã đăng xuất và thu hồi phiên.', 'ok');
     }
 
     // --- Main Data Sync ---
