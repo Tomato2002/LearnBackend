@@ -329,14 +329,21 @@
       <div id="panel-chat" class="hidden">
         <div class="card">
           <div class="row" style="justify-content:space-between; margin-bottom:12px;">
-            <strong>💬 Kênh Chat Thế Giới (ASP.NET Core SignalR WebSocket)</strong>
+            <div class="row">
+              <strong>💬 Kênh Chat Thế Giới (SignalR Groups)</strong>
+              <select id="chatChannelSelect" onchange="changeChatChannel()">
+                <option value="1">Kênh #1</option>
+                <option value="2">Kênh #2</option>
+                <option value="3">Kênh #3</option>
+              </select>
+            </div>
             <span id="signalrStatus" class="badge badge-info">Đang kết nối...</span>
           </div>
           <div id="chatMessages" class="combat-log-list" style="height:260px; margin-bottom:12px;">
-            <div class="muted">Mở thêm 1 tab ẩn danh đăng ký tài khoản thứ 2 để chat và đánh Guild Boss cùng nhau real-time!</div>
+            <div class="muted">Mỗi kênh chỉ gửi tin nhắn cho người trong cùng Group (tránh nghẽn băng thông 10k CCU). Chống spam: 2 giây/tin!</div>
           </div>
           <form onsubmit="sendChat(event)" class="row">
-            <input id="chatInput" type="text" placeholder="Nhập tin nhắn gửi toàn server..." maxlength="200"
+            <input id="chatInput" type="text" placeholder="Nhập tin nhắn gửi kênh hiện tại (cooldown 2s)..." maxlength="200"
               style="flex:1; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg); color:var(--text);" />
             <button type="submit" class="btn-primary">Gửi 🚀</button>
           </form>
@@ -1125,9 +1132,13 @@
         if (box.firstElementChild?.classList.contains('muted')) box.innerHTML = '';
         const div = document.createElement('div');
         div.className = 'turn-row hero';
-        div.innerHTML = `<span class="muted">[${new Date(msg.sentAtUtc).toLocaleTimeString()}]</span> <strong>${escapeHtml(msg.senderName)}:</strong> ${escapeHtml(msg.message)}`;
+        div.innerHTML = `<span class="badge badge-info">Kênh #${msg.channelId || 1}</span> <span class="muted">[${new Date(msg.sentAtUtc).toLocaleTimeString()}]</span> <strong>${escapeHtml(msg.senderName)}:</strong> ${escapeHtml(msg.message)}`;
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
+      });
+
+      hubConnection.on('ChannelJoined', info => {
+        showToast(info.message, 'ok');
       });
 
       hubConnection.on('ReceiveAnnouncement', ann => {
@@ -1150,6 +1161,16 @@
         });
     }
 
+    async function changeChatChannel() {
+      const ch = parseInt(document.getElementById('chatChannelSelect').value, 10) || 1;
+      if (!hubConnection) return;
+      try {
+        await hubConnection.invoke('JoinChatChannel', ch);
+      } catch {
+        showToast('Không thể chuyển kênh chat.', 'err');
+      }
+    }
+
     async function sendChat(e) {
       e.preventDefault();
       const input = document.getElementById('chatInput');
@@ -1159,7 +1180,10 @@
         await hubConnection.invoke('SendWorldChat', text);
         input.value = '';
       } catch (err) {
-        showToast('Không gửi được tin nhắn SignalR.', 'err');
+        const msg = err?.message?.includes('CHAT_COOLDOWN')
+          ? 'Bạn nhắn quá nhanh, vui lòng chờ 2 giây!'
+          : 'Không gửi được tin nhắn SignalR.';
+        showToast(msg, 'err');
       }
     }
 

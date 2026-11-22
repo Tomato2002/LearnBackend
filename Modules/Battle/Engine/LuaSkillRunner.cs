@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using LearnBackend.Modules.Battle.DTOs;
 using MoonSharp.Interpreter;
@@ -56,7 +57,6 @@ public sealed class LuaBattleContext(
     public int deal_damage(LuaUnitProxy targetProxy, int rawPower, string label)
     {
         var target = targetProxy.Inner;
-        // Công thức giảm sát thương theo DEF: Mitigation = 100 / (100 + DEF)
         var mitigation = 100.0 / (100.0 + Math.Max(0, target.Def));
         var finalDamage = Math.Max(1, (int)Math.Round(rawPower * mitigation));
 
@@ -104,12 +104,16 @@ public sealed class LuaBattleContext(
 }
 
 /// <summary>
-/// Singleton quản lý và thực thi các file Skill Lua trong chế độ Sandbox (MoonSharp).
-/// Tắt hoàn toàn os / io / debug / dofile để script không thể chạm vào hệ thống.
+/// Singleton quản lý và thực thi Skill Lua trong Sandbox (MoonSharp) có OBJECT POOL:
+/// - Không còn new Script() + DoString() lại ở mỗi lượt đánh (giảm mạnh CPU & GC ở 10k CCU).
+/// - Mỗi skillId có 1 pool các VM đã biên dịch sẵn hàm on_cast(ctx); mượn chạy xong trả lại pool an toàn đa luồng.
 /// </summary>
 public sealed class LuaSkillRunner
 {
+    private const int MaxPoolSizePerSkill = 64;
+
     private readonly FrozenDictionary<string, string> _skillScripts;
+    private readonly FrozenDictionary<string, ConcurrentBag<CompiledSkillVm>> _vmPools;
 
     static LuaSkillRunner()
     {
@@ -120,32 +124,66 @@ public sealed class LuaSkillRunner
     public LuaSkillRunner(IWebHostEnvironment env)
     {
         var scriptsDir = Path.Combine(env.ContentRootPath, "Data", "Scripts", "Skills");
-        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var sourceDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var poolDict = new Dictionary<string, ConcurrentBag<CompiledSkillVm>>(StringComparer.OrdinalIgnoreCase);
 
         if (Directory.Exists(scriptsDir))
         {
             foreach (var file in Directory.GetFiles(scriptsDir, "*.lua"))
             {
                 var skillId = Path.GetFileNameWithoutExtension(file);
-                dict[skillId] = File.ReadAllText(file);
+                var code = File.ReadAllText(file);
+                sourceDict[skillId] = code;
+
+                // Khởi tạo sẵn 2 VM đã biên dịch trong pool để ấm máy (warm-up) ngay lúc startup
+                var bag = new ConcurrentBag<CompiledSkillVm>();
+                bag.Add(CompileVm(skillId, code));
+                bag.Add(CompileVm(skillId, code));
+                poolDict[skillId] = bag;
             }
         }
 
-        _skillScripts = dict.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        _skillScripts = sourceDict.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        _vmPools = poolDict.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlyDictionary<string, string> GetLoadedScripts() => _skillScripts;
 
     public void ExecuteSkill(string skillId, LuaBattleContext context)
     {
-        if (!_skillScripts.TryGetValue(skillId, out var luaCode))
+        if (!_skillScripts.TryGetValue(skillId, out var luaCode) ||
+            !_vmPools.TryGetValue(skillId, out var pool))
         {
-            // Fallback an toàn nếu chưa có file .lua cho skillId này
             var caster = context.get_caster();
             context.deal_damage(context.get_target(), caster.atk, "Đòn Đánh Thường");
             return;
         }
 
+        // Mượn VM đã biên dịch sẵn từ Pool (không cần parse/compile lại Lua!)
+        var vm = pool.TryTake(out var pooled) ? pooled : CompileVm(skillId, luaCode);
+        var healthy = true;
+
+        try
+        {
+            vm.Script.Call(vm.OnCastFunc, context);
+        }
+        catch
+        {
+            healthy = false;
+            throw;
+        }
+        finally
+        {
+            // Chỉ trả VM sạch về pool và giữ giới hạn MaxPoolSizePerSkill để không phình RAM
+            if (healthy && pool.Count < MaxPoolSizePerSkill)
+            {
+                pool.Add(vm);
+            }
+        }
+    }
+
+    private static CompiledSkillVm CompileVm(string skillId, string luaCode)
+    {
         // Preset_SoftSandbox: chỉ cho phép toán học, chuỗi, bảng cơ bản — CẤM os/io/debug!
         var script = new Script(CoreModules.Preset_SoftSandbox);
         script.DoString(luaCode, codeFriendlyName: $"{skillId}.lua");
@@ -156,6 +194,8 @@ public sealed class LuaSkillRunner
             throw new InvalidOperationException($"File {skillId}.lua thiếu hàm on_cast(ctx).");
         }
 
-        script.Call(onCast, context);
+        return new CompiledSkillVm(script, onCast);
     }
+
+    private sealed record CompiledSkillVm(Script Script, DynValue OnCastFunc);
 }

@@ -30,6 +30,32 @@ public class TurnBasedCombatEngineTests
         }
     }
 
+    [Fact]
+    public async Task Simulate_ConcurrentBattlesWithLuaVmPool_RemainsThreadSafeAndDeterministic()
+    {
+        var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+        var env = new TestWebHostEnvironment(repoRoot);
+        var runner = new LuaSkillRunner(env);
+        var engine = new TurnBasedCombatEngine(runner);
+
+        const int seed = 999888;
+        var expected = engine.Simulate(CreateHeroes(), CreateEnemies(), seed);
+
+        // Chạy 20 trận chiến đấu Lua song song cùng lúc để kiểm chứng VM Object Pool an toàn đa luồng
+        var tasks = Enumerable.Range(0, 20)
+            .Select(_ => Task.Run(() => engine.Simulate(CreateHeroes(), CreateEnemies(), seed)))
+            .ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        foreach (var actual in results)
+        {
+            Assert.Equal(expected.IsVictory, actual.IsVictory);
+            Assert.Equal(expected.TotalRounds, actual.TotalRounds);
+            Assert.Equal(expected.Logs.Count, actual.Logs.Count);
+        }
+    }
+
     private static List<CombatUnit> CreateHeroes() =>
     [
         new CombatUnit
