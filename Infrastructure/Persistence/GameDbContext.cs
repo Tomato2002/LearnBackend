@@ -63,6 +63,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             entity.Property(x => x.Nickname).HasMaxLength(32).IsRequired();
             entity.HasIndex(x => x.UserAccountId).IsUnique();
             entity.HasIndex(x => x.Nickname).IsUnique();
+            entity.HasIndex(x => x.ArenaRating);
         });
 
         modelBuilder.Entity<CurrencyLedger>(entity =>
@@ -133,6 +134,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             entity.Property(x => x.Title).HasMaxLength(128).IsRequired();
             entity.Property(x => x.Body).HasMaxLength(512).IsRequired();
             entity.Property(x => x.RewardItemId).HasMaxLength(64);
+            entity.HasIndex(x => x.ExpiresAtUtc);
         });
 
         modelBuilder.Entity<PlayerGlobalMailClaim>(entity =>
