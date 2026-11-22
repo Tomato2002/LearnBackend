@@ -7,12 +7,15 @@ using LearnBackend.Common.Events;
 using LearnBackend.Common.Idempotency;
 using LearnBackend.Common.Locking;
 using LearnBackend.Common.Middleware;
+using LearnBackend.Hubs;
 using LearnBackend.Infrastructure.Persistence;
 using LearnBackend.Infrastructure.Security;
+using LearnBackend.Modules.Arena;
 using LearnBackend.Modules.Auth;
 using LearnBackend.Modules.Battle;
 using LearnBackend.Modules.Battle.Engine;
 using LearnBackend.Modules.Gacha;
+using LearnBackend.Modules.Guild;
 using LearnBackend.Modules.Hero;
 using LearnBackend.Modules.Inventory;
 using LearnBackend.Modules.Mail;
@@ -57,6 +60,21 @@ builder.Services
             ValidAudience = jwtOptions.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        // Cho phép SignalR WebSocket truyền JWT qua query string ?access_token=...
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -118,7 +136,7 @@ builder.Services.AddScoped<IGameEventHandler<ShopPurchasedEvent>, QuestEventHand
 builder.Services.AddSingleton<LuaSkillRunner>();
 builder.Services.AddSingleton<TurnBasedCombatEngine>();
 
-// 8. Game Modules (Chặng 1 + 2 + 3)
+// 8. Game Modules (Chặng 1 + 2 + 3 + 4A)
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<HeroService>();
@@ -128,13 +146,19 @@ builder.Services.AddScoped<GachaService>();
 builder.Services.AddScoped<ShopService>();
 builder.Services.AddScoped<QuestService>();
 builder.Services.AddScoped<MailService>();
+builder.Services.AddScoped<ArenaService>();
+builder.Services.AddScoped<GuildService>();
+
+// 9. SignalR Real-time Hub (World Chat & Live Broadcast)
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IGameRealtimeBroadcaster, SignalRGameBroadcaster>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Tự động tạo file SQLite, nâng cấp schema dev nếu cần, và seed 1 thư Global Mail đền bù mẫu
+// Tự động tạo file SQLite, nâng cấp schema dev nếu cần, và seed 2 thư Global Mail mẫu
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GameDbContext>();
@@ -143,7 +167,7 @@ using (var scope = app.Services.CreateScope())
     var conn = db.Database.GetDbConnection();
     conn.Open();
     using var cmd = conn.CreateCommand();
-    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='GlobalMails';";
+    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Guilds';";
     var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
     conn.Close();
 
@@ -160,8 +184,8 @@ using (var scope = app.Services.CreateScope())
             new GlobalMail
             {
                 Id = Guid.NewGuid(),
-                Title = "🎁 Quà Chào Mừng Mở Server (Chặng 3)",
-                Body = "Cảm ơn bạn đã tham gia thử nghiệm! Tặng bạn 1.000 Gems (đủ quay 10 lần Gacha kích hoạt bảo hiểm 5★) và 1.000 Gold.",
+                Title = "🎁 Quà Chào Mừng Mở Server (Chặng 4A)",
+                Body = "Tặng bạn 1.000 Gems (đủ quay 10 lần Gacha kích hoạt bảo hiểm 5★ + phát loa SignalR!) và 1.000 Gold.",
                 RewardGold = 1000,
                 RewardGems = 1000,
                 RewardItemId = "stone_enhance",
@@ -173,7 +197,7 @@ using (var scope = app.Services.CreateScope())
             {
                 Id = Guid.NewGuid(),
                 Title = "🛠️ Đền Bù Bảo Trì Định Kỳ",
-                Body = "Server vừa nâng cấp hệ thống Event Bus, Gacha Pity và Cửa Hàng ngày. Chúc bạn chơi game vui vẻ!",
+                Body = "Server vừa ra mắt Đấu Trường PvP, Bang Hội, Guild Boss và Chat Thế Giới SignalR!",
                 RewardGold = 500,
                 RewardGems = 200,
                 RewardItemId = "potion_exp_small",
@@ -185,7 +209,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// 9. HTTP Pipeline (Thứ tự middleware cực kỳ quan trọng!)
+// 10. HTTP & WebSocket Pipeline (Thứ tự middleware cực kỳ quan trọng!)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -209,5 +233,6 @@ app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapHealthChecks("/health");
 app.MapControllers();
+app.MapHub<GameHub>("/hubs/game");
 
 app.Run();

@@ -20,5 +20,10 @@ public sealed class PlayerProfile
     public int StoredStamina { get; set; }
     public DateTime LastStaminaUpdatedAtUtc { get; set; }
 
+    // Trạng thái Đấu Trường PvP (Elo Rating)
+    public int ArenaRating { get; set; } = 1000;
+    public int ArenaWins { get; set; }
+    public int ArenaLosses { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 }

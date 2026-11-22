@@ -96,4 +96,31 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/api/quests
 Authorization: Bearer {{token}}
 
+### 18. Xem Bảng Xếp Hạng & Tìm đối thủ Arena PvP
+GET {{baseUrl}}/api/arena/leaderboard?top=20
+Authorization: Bearer {{token}}
+
+### 19. Khiêu chiến Bot Arena PvP (tính điểm Elo + chạy Lua Combat)
+POST {{baseUrl}}/api/arena/challenge
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "botId": "bot_silver"
+}
+
+### 20. Tạo Bang Hội mới & Đánh Guild Boss (Optimistic Concurrency)
+POST {{baseUrl}}/api/guilds
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "DragonKnights"
+}
+
+### 21. Đánh Guild Boss (-10 Stamina, Last Hit thưởng +300 Gems + phát loa SignalR)
+POST {{baseUrl}}/api/guilds/boss/attack
+Authorization: Bearer {{token}}
+
+
 

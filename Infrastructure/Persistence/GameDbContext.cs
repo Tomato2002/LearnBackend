@@ -1,5 +1,7 @@
+using LearnBackend.Modules.Arena.Entities;
 using LearnBackend.Modules.Auth.Entities;
 using LearnBackend.Modules.Gacha.Entities;
+using LearnBackend.Modules.Guild.Entities;
 using LearnBackend.Modules.Hero.Entities;
 using LearnBackend.Modules.Inventory.Entities;
 using LearnBackend.Modules.Mail.Entities;
@@ -27,6 +29,11 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<PlayerQuestProgress> PlayerQuestProgresses => Set<PlayerQuestProgress>();
     public DbSet<GlobalMail> GlobalMails => Set<GlobalMail>();
     public DbSet<PlayerGlobalMailClaim> PlayerGlobalMailClaims => Set<PlayerGlobalMailClaim>();
+
+    // Stage 4A Social & PvP Tables
+    public DbSet<ArenaMatchHistory> ArenaMatchHistories => Set<ArenaMatchHistory>();
+    public DbSet<Guild> Guilds => Set<Guild>();
+    public DbSet<GuildMember> GuildMembers => Set<GuildMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -132,6 +139,29 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
         {
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.PlayerId, x.GlobalMailId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ArenaMatchHistory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DefenderName).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => new { x.AttackerPlayerId, x.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<Guild>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.BossName).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<GuildMember>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Role).HasMaxLength(16).IsRequired();
+            entity.HasIndex(x => x.PlayerId).IsUnique(); // Mỗi người chơi chỉ vào 1 Bang
+            entity.HasIndex(x => x.GuildId);
         });
     }
 }

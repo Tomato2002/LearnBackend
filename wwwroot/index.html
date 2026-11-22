@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Turn-Based RPG — Client Simulator (Chặng 2)</title>
+  <title>Turn-Based RPG — Client Simulator (Chặng 4A)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
   <style>
     :root {
       --bg: #0b0e14;
@@ -278,9 +279,15 @@
         </div>
       </header>
 
+      <!-- Live SignalR Server Announcement Banner -->
+      <div id="liveBanner" class="card hidden" style="margin-bottom:14px; padding:10px 16px; border-color:var(--gold); background:rgba(245,185,66,0.12); color:var(--gold); font-weight:600; font-size:13px;"></div>
+
       <!-- Tabs -->
       <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="stages" onclick="switchTab('stages')">⚔️ Chiến Dịch</button>
+        <button class="nav-tab" data-tab="arena" onclick="switchTab('arena')">🏆 Đấu Trường</button>
+        <button class="nav-tab" data-tab="guild" onclick="switchTab('guild')">🏰 Bang Hội</button>
+        <button class="nav-tab" data-tab="chat" onclick="switchTab('chat')">💬 Chat Live</button>
         <button class="nav-tab" data-tab="gacha" onclick="switchTab('gacha')">🌟 Gacha</button>
         <button class="nav-tab" data-tab="shop" onclick="switchTab('shop')">🛒 Cửa Hàng</button>
         <button class="nav-tab" data-tab="quests" onclick="switchTab('quests')">🎯 Nhiệm Vụ <span id="questDot" class="badge badge-danger hidden">0</span></button>
@@ -295,6 +302,45 @@
       <div id="panel-stages">
         <div class="grid" id="stagesGrid"></div>
         <div id="battleResultPanel" class="battle-panel hidden"></div>
+      </div>
+
+      <!-- TAB: ARENA PvP -->
+      <div id="panel-arena" class="hidden">
+        <div id="arenaHeader" class="card" style="margin-bottom:16px; padding:16px;"></div>
+        <div class="section-title">⚔️ Đối thủ ngang hạng Elo (Người chơi thật & Bot Arena)</div>
+        <div class="grid" id="arenaOpponentsGrid" style="margin-bottom:18px;"></div>
+        <div id="arenaResultPanel" class="battle-panel hidden" style="margin-bottom:18px;"></div>
+        <div class="section-title">🏆 Bảng Xếp Hạng Server (Top Elo)</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Hạng</th><th>Người chơi</th><th>Level</th><th>Điểm Elo</th><th>Thắng / Thua</th></tr></thead>
+            <tbody id="arenaLeaderboardBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: GUILD & GUILD BOSS -->
+      <div id="panel-guild" class="hidden">
+        <div id="guildContent"></div>
+        <div id="guildBossResultPanel" class="battle-panel hidden"></div>
+      </div>
+
+      <!-- TAB: WORLD CHAT (SIGNALR) -->
+      <div id="panel-chat" class="hidden">
+        <div class="card">
+          <div class="row" style="justify-content:space-between; margin-bottom:12px;">
+            <strong>💬 Kênh Chat Thế Giới (ASP.NET Core SignalR WebSocket)</strong>
+            <span id="signalrStatus" class="badge badge-info">Đang kết nối...</span>
+          </div>
+          <div id="chatMessages" class="combat-log-list" style="height:260px; margin-bottom:12px;">
+            <div class="muted">Mở thêm 1 tab ẩn danh đăng ký tài khoản thứ 2 để chat và đánh Guild Boss cùng nhau real-time!</div>
+          </div>
+          <form onsubmit="sendChat(event)" class="row">
+            <input id="chatInput" type="text" placeholder="Nhập tin nhắn gửi toàn server..." maxlength="200"
+              style="flex:1; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg); color:var(--text);" />
+            <button type="submit" class="btn-primary">Gửi 🚀</button>
+          </form>
+        </div>
       </div>
 
       <!-- TAB: GACHA -->
@@ -557,6 +603,7 @@
       document.getElementById('authView').classList.add('hidden');
       document.getElementById('gameView').classList.remove('hidden');
       await refreshAll();
+      connectSignalR();
     }
 
     async function refreshAll() {
@@ -1056,11 +1103,240 @@
       } catch { /* handled */ }
     }
 
+    // --- Stage 4A: Arena PvP, Guild & Guild Boss, SignalR Live Chat ---
+    let hubConnection = null;
+
+    function connectSignalR() {
+      if (typeof signalR === 'undefined') {
+        document.getElementById('signalrStatus').textContent = 'Không tải được SignalR CDN';
+        return;
+      }
+      if (hubConnection) {
+        hubConnection.stop().catch(() => {});
+      }
+
+      hubConnection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/game', { accessTokenFactory: () => localStorage.getItem(TOKEN_KEY) || '' })
+        .withAutomaticReconnect()
+        .build();
+
+      hubConnection.on('ReceiveWorldChat', msg => {
+        const box = document.getElementById('chatMessages');
+        if (box.firstElementChild?.classList.contains('muted')) box.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'turn-row hero';
+        div.innerHTML = `<span class="muted">[${new Date(msg.sentAtUtc).toLocaleTimeString()}]</span> <strong>${escapeHtml(msg.senderName)}:</strong> ${escapeHtml(msg.message)}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+      });
+
+      hubConnection.on('ReceiveAnnouncement', ann => {
+        const banner = document.getElementById('liveBanner');
+        banner.textContent = `📢 ${ann.message}`;
+        banner.classList.remove('hidden');
+        showToast(ann.message, 'ok');
+      });
+
+      hubConnection.start()
+        .then(() => {
+          const st = document.getElementById('signalrStatus');
+          st.textContent = '🟢 Đã kết nối WebSocket';
+          st.className = 'badge badge-ok';
+        })
+        .catch(() => {
+          const st = document.getElementById('signalrStatus');
+          st.textContent = '🔴 Mất kết nối';
+          st.className = 'badge badge-danger';
+        });
+    }
+
+    async function sendChat(e) {
+      e.preventDefault();
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text || !hubConnection) return;
+      try {
+        await hubConnection.invoke('SendWorldChat', text);
+        input.value = '';
+      } catch (err) {
+        showToast('Không gửi được tin nhắn SignalR.', 'err');
+      }
+    }
+
+    async function loadArena() {
+      try {
+        const [lb, opps] = await Promise.all([
+          apiFetch('GET', '/api/arena/leaderboard?top=20'),
+          apiFetch('GET', '/api/arena/opponents')
+        ]);
+
+        document.getElementById('arenaHeader').innerHTML = `
+          <div class="row" style="justify-content:space-between;">
+            <div>
+              <strong>🏆 Hạng của bạn: #${lb.myRank}</strong> • Điểm Elo: <strong style="color:var(--gold)">${lb.myRating}</strong>
+              <span class="muted">(${lb.myWins} Thắng / ${lb.myLosses} Thua)</span>
+            </div>
+            <button class="btn-ghost" onclick="loadArena()">🔄 Tìm đối thủ mới</button>
+          </div>`;
+
+        document.getElementById('arenaOpponentsGrid').innerHTML = opps.map(o => `
+          <div class="game-card">
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                <strong>${escapeHtml(o.name)}</strong>
+                <span class="badge badge-gold">Elo ${o.rating}</span>
+              </div>
+              <p class="muted" style="font-size:12px;">${escapeHtml(o.teamSummary)}</p>
+            </div>
+            <button class="btn-primary" onclick="challengeArena(${o.playerId ? `'${o.playerId}', null` : `null, '${escapeHtml(o.botId)}'`})">
+              ⚔️ Khiêu Chiến PvP
+            </button>
+          </div>`).join('');
+
+        document.getElementById('arenaLeaderboardBody').innerHTML = lb.topPlayers.map(p => `
+          <tr>
+            <td><strong>#${p.rank}</strong></td>
+            <td><strong>${escapeHtml(p.nickname)}</strong></td>
+            <td>Lv.${p.level}</td>
+            <td style="color:var(--gold); font-weight:700;">${p.arenaRating}</td>
+            <td class="muted">${p.wins}W / ${p.losses}L</td>
+          </tr>`).join('');
+      } catch { /* ignore */ }
+    }
+
+    async function challengeArena(defenderPlayerId, botId) {
+      try {
+        const res = await apiFetch('POST', '/api/arena/challenge', { defenderPlayerId, botId });
+        const panel = document.getElementById('arenaResultPanel');
+        panel.classList.remove('hidden');
+        const deltaStr = res.ratingDelta >= 0 ? `+${res.ratingDelta}` : `${res.ratingDelta}`;
+        panel.innerHTML = `
+          <div class="battle-banner ${res.isVictory ? 'win' : 'lose'}">
+            <div>
+              <h3>${res.isVictory ? '🏆 THẮNG PvP' : '💀 THUA PvP'} vs ${escapeHtml(res.defenderName)}</h3>
+              <div class="muted">Elo: ${res.ratingBefore} → <strong>${res.ratingAfter} (${deltaStr})</strong> • ${res.totalRounds} lượt</div>
+            </div>
+            ${res.goldEarned ? `<span class="badge badge-gold">+${res.goldEarned} 🪙</span>` : ''}
+          </div>`;
+        showToast(`${res.isVictory ? 'Thắng' : 'Thua'} Arena (${deltaStr} Elo)!`, res.isVictory ? 'ok' : 'err');
+        await loadArena();
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    async function loadGuild() {
+      try {
+        const [myGuild, allGuilds] = await Promise.all([
+          apiFetch('GET', '/api/guilds/me'),
+          apiFetch('GET', '/api/guilds')
+        ]);
+
+        const container = document.getElementById('guildContent');
+        if (!myGuild) {
+          container.innerHTML = `
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="margin-bottom:10px;">🏰 Tạo Bang Hội Mới</h3>
+              <div class="row">
+                <input id="newGuildName" type="text" placeholder="Nhập tên Bang (vd: DragonKnights)"
+                  style="flex:1; padding:9px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg); color:var(--text);" />
+                <button class="btn-primary" onclick="createGuild()">Tạo Bang Hội</button>
+              </div>
+            </div>
+            <div class="section-title">📋 Danh sách Bang Hội đang tuyển thành viên</div>
+            <div class="grid">
+              ${allGuilds.length ? allGuilds.map(g => `
+                <div class="game-card">
+                  <div>
+                    <strong>🏰 ${escapeHtml(g.name)}</strong>
+                    <p class="muted" style="font-size:12px;">Thành viên: ${g.memberCount} • ${escapeHtml(g.bossName)}</p>
+                  </div>
+                  <button class="btn-emerald" onclick="joinGuild('${g.guildId}')">Gia nhập</button>
+                </div>`).join('') : '<div class="muted">Chưa có Bang Hội nào. Hãy là người đầu tiên lập Bang!</div>'}
+            </div>`;
+          return;
+        }
+
+        const bossPct = Math.round((myGuild.bossCurrentHp / Math.max(1, myGuild.bossMaxHp)) * 100);
+        container.innerHTML = `
+          <div class="card" style="margin-bottom:16px;">
+            <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+              <div>
+                <h3 style="font-size:18px;">🏰 Bang: ${escapeHtml(myGuild.name)}</h3>
+                <div class="muted">${escapeHtml(myGuild.bossName)} • Concurrency Version: <code>v${myGuild.bossVersion}</code></div>
+              </div>
+              <button class="btn-danger" onclick="leaveGuild()">Rời Bang</button>
+            </div>
+            <div style="margin-bottom:14px;">
+              <div class="row" style="justify-content:space-between; font-size:13px; margin-bottom:4px;">
+                <strong>🐉 HP Guild Boss: ${myGuild.bossCurrentHp.toLocaleString()} / ${myGuild.bossMaxHp.toLocaleString()}</strong>
+                <span>${bossPct}%</span>
+              </div>
+              <div class="progress-bar" style="height:10px;"><div class="progress-fill" style="width:${bossPct}%; background:linear-gradient(90deg,#e11d48,#fb7185);"></div></div>
+            </div>
+            <button class="btn-gold" onclick="attackGuildBoss()">⚔️ Đánh Guild Boss (-10 ⚡ • Last Hit thưởng +300 💎!)</button>
+          </div>
+          <div class="section-title">🏅 Bảng Xếp Hạng Sát Thương Bang Hội</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Thành viên</th><th>Chức vụ</th><th>Tổng sát thương lên Boss</th></tr></thead>
+              <tbody>
+                ${myGuild.members.map(m => `
+                  <tr>
+                    <td><strong>${escapeHtml(m.nickname)}</strong></td>
+                    <td><span class="badge badge-info">${escapeHtml(m.role)}</span></td>
+                    <td style="color:var(--danger); font-weight:700;">${m.totalBossDamage.toLocaleString()} DMG</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch { /* ignore */ }
+    }
+
+    async function createGuild() {
+      const name = document.getElementById('newGuildName').value.trim();
+      if (!name) return;
+      try {
+        await apiFetch('POST', '/api/guilds', { name });
+        showToast(`Lập Bang "${name}" thành công!`, 'ok');
+        await loadGuild();
+      } catch { /* handled */ }
+    }
+
+    async function joinGuild(guildId) {
+      try {
+        await apiFetch('POST', `/api/guilds/${guildId}/join`);
+        showToast('Gia nhập Bang Hội thành công!', 'ok');
+        await loadGuild();
+      } catch { /* handled */ }
+    }
+
+    async function leaveGuild() {
+      try {
+        await apiFetch('POST', '/api/guilds/leave');
+        showToast('Đã rời Bang Hội.', 'ok');
+        await loadGuild();
+      } catch { /* handled */ }
+    }
+
+    async function attackGuildBoss() {
+      try {
+        const res = await apiFetch('POST', '/api/guilds/boss/attack');
+        const msg = res.killedBoss
+          ? `🔥 LAST HIT! Gây ${res.damageDealt} DMG, hạ Boss & nhận +${res.lastHitBonusGems} Gems, +${res.goldReward} Gold!`
+          : `⚔️ Gây ${res.damageDealt} DMG lên Guild Boss (+${res.goldReward} Gold)!`;
+        showToast(msg, 'ok');
+        await loadGuild();
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
     function switchTab(tab) {
       document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-      ['stages', 'gacha', 'shop', 'quests', 'mail', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
+      ['stages', 'arena', 'guild', 'chat', 'gacha', 'shop', 'quests', 'mail', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
         document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
       });
+      if (tab === 'arena') loadArena();
+      if (tab === 'guild') loadGuild();
       if (tab === 'ledger') loadLedger();
       if (tab === 'lua') loadLuaScripts();
     }
