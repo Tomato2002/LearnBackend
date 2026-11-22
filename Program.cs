@@ -9,6 +9,7 @@ using LearnBackend.Common.Locking;
 using LearnBackend.Common.Middleware;
 using LearnBackend.Hubs;
 using LearnBackend.Infrastructure.Persistence;
+using LearnBackend.Infrastructure.Redis;
 using LearnBackend.Infrastructure.Security;
 using LearnBackend.Modules.Arena;
 using LearnBackend.Modules.Auth;
@@ -28,12 +29,27 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Database (SQLite - sau này đổi sang PostgreSQL chỉ cần thay UseSqlite -> UseNpgsql)
+// 1. Database Provider Switching (SQLite mặc định cho local; đổi sang PostgreSQL khi chạy Docker/Production)
+var dbProvider = builder.Configuration["Database:Provider"] ?? "Sqlite";
+var usePostgres = string.Equals(dbProvider, "PostgreSQL", StringComparison.OrdinalIgnoreCase);
+
 builder.Services.AddDbContext<GameDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("GameDb")));
+{
+    if (usePostgres)
+    {
+        var pgConn = builder.Configuration.GetConnectionString("Postgres")
+            ?? throw new InvalidOperationException("Thiếu ConnectionStrings:Postgres khi bật PostgreSQL.");
+        options.UseNpgsql(pgConn);
+    }
+    else
+    {
+        options.UseSqlite(builder.Configuration.GetConnectionString("GameDb"));
+    }
+});
 
 // 2. Security & JWT Authentication (Fail-fast nếu thiếu hoặc SecretKey quá ngắn)
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
@@ -118,13 +134,40 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database");
 
-// 5. Common & Infrastructure Services
+// 5. Common, Infrastructure & Redis Scale-Out Switching (Chặng 4B!)
+// Nếu cấu hình ConnectionStrings:Redis -> tự động bật Redis Distributed Lock, Redis Idempotency,
+// Redis ZSET Leaderboard và SignalR Redis Backplane để chạy song song nhiều server!
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<MasterDataStore>();
-builder.Services.AddSingleton<IPlayerLockManager, InMemoryPlayerLockManager>();
-builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<JwtTokenGenerator>();
+
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+var useRedis = !string.IsNullOrWhiteSpace(redisConnectionString);
+
+var signalRBuilder = builder.Services.AddSignalR();
+
+if (useRedis)
+{
+    var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString!);
+    builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+    builder.Services.AddSingleton<IPlayerLockManager, RedisPlayerLockManager>();
+    builder.Services.AddSingleton<IIdempotencyStore, RedisIdempotencyStore>();
+    builder.Services.AddScoped<IArenaLeaderboardStore, RedisArenaLeaderboardStore>();
+
+    signalRBuilder.AddStackExchangeRedis(redisConnectionString!, o =>
+    {
+        o.Configuration.ChannelPrefix = RedisChannel.Literal("RpgServer");
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IPlayerLockManager, InMemoryPlayerLockManager>();
+    builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
+    builder.Services.AddScoped<IArenaLeaderboardStore, DbArenaLeaderboardStore>();
+}
+
+builder.Services.AddSingleton<IGameRealtimeBroadcaster, SignalRGameBroadcaster>();
 
 // 6. Internal Domain Event Bus + Event Handlers (Decoupled Architecture)
 builder.Services.AddScoped<IGameEventBus, InProcessGameEventBus>();
@@ -132,11 +175,11 @@ builder.Services.AddScoped<IGameEventHandler<StageClearedEvent>, QuestEventHandl
 builder.Services.AddScoped<IGameEventHandler<GachaSummonedEvent>, QuestEventHandlers>();
 builder.Services.AddScoped<IGameEventHandler<ShopPurchasedEvent>, QuestEventHandlers>();
 
-// 7. Combat Engine + Sandboxed Lua Skill Runner (MoonSharp)
+// 7. Combat Engine + Sandboxed Lua Skill Runner (MoonSharp VM Object Pool)
 builder.Services.AddSingleton<LuaSkillRunner>();
 builder.Services.AddSingleton<TurnBasedCombatEngine>();
 
-// 8. Game Modules (Chặng 1 + 2 + 3 + 4A)
+// 8. Game Modules (Chặng 1 + 2 + 3 + 4A + 4B)
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<HeroService>();
@@ -149,32 +192,37 @@ builder.Services.AddScoped<MailService>();
 builder.Services.AddScoped<ArenaService>();
 builder.Services.AddScoped<GuildService>();
 
-// 9. SignalR Real-time Hub (World Chat & Live Broadcast)
-builder.Services.AddSignalR();
-builder.Services.AddSingleton<IGameRealtimeBroadcaster, SignalRGameBroadcaster>();
-
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Tự động tạo file SQLite, nâng cấp schema dev nếu cần, và seed 2 thư Global Mail mẫu
+// Log rõ chế độ hạ tầng đang chạy
+app.Logger.LogInformation(
+    "🚀 Game Server starting | Database={Database} | ScaleMode={ScaleMode}",
+    usePostgres ? "PostgreSQL" : "SQLite (Local)",
+    useRedis ? "Redis Distributed (Lock + Idempotency + ZSET + SignalR Backplane)" : "In-Memory (Single Node)");
+
+// Tự động tạo schema & seed 2 thư Global Mail mẫu
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GameDbContext>();
     db.Database.EnsureCreated();
 
-    var conn = db.Database.GetDbConnection();
-    conn.Open();
-    using var cmd = conn.CreateCommand();
-    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Guilds';";
-    var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
-    conn.Close();
-
-    if (!hasLatestSchema)
+    if (!usePostgres)
     {
-        db.Database.EnsureDeleted();
-        db.Database.EnsureCreated();
+        var conn = db.Database.GetDbConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Guilds';";
+        var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+        conn.Close();
+
+        if (!hasLatestSchema)
+        {
+            db.Database.EnsureDeleted();
+            db.Database.EnsureCreated();
+        }
     }
 
     if (!db.GlobalMails.Any())
@@ -184,7 +232,7 @@ using (var scope = app.Services.CreateScope())
             new GlobalMail
             {
                 Id = Guid.NewGuid(),
-                Title = "🎁 Quà Chào Mừng Mở Server (Chặng 4A)",
+                Title = "🎁 Quà Chào Mừng Mở Server (Chặng 4B)",
                 Body = "Tặng bạn 1.000 Gems (đủ quay 10 lần Gacha kích hoạt bảo hiểm 5★ + phát loa SignalR!) và 1.000 Gold.",
                 RewardGold = 1000,
                 RewardGems = 1000,
@@ -197,7 +245,7 @@ using (var scope = app.Services.CreateScope())
             {
                 Id = Guid.NewGuid(),
                 Title = "🛠️ Đền Bù Bảo Trì Định Kỳ",
-                Body = "Server vừa ra mắt Đấu Trường PvP, Bang Hội, Guild Boss và Chat Thế Giới SignalR!",
+                Body = "Server đã sẵn sàng scale lên 10k+ CCU với PostgreSQL, Redis Distributed Lock, ZSET Leaderboard và SignalR Backplane!",
                 RewardGold = 500,
                 RewardGems = 200,
                 RewardItemId = "potion_exp_small",
@@ -209,7 +257,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// 10. HTTP & WebSocket Pipeline (Thứ tự middleware cực kỳ quan trọng!)
+// 9. HTTP & WebSocket Pipeline (Thứ tự middleware cực kỳ quan trọng!)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())

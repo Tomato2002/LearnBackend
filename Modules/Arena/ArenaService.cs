@@ -57,7 +57,8 @@ public sealed record ArenaChallengeResponse(
 public sealed class ArenaService(
     GameDbContext db,
     MasterDataStore masterData,
-    TurnBasedCombatEngine combatEngine)
+    TurnBasedCombatEngine combatEngine,
+    IArenaLeaderboardStore leaderboardStore)
 {
     private const long WinGoldReward = 150;
 
@@ -75,28 +76,33 @@ public sealed class ArenaService(
         var me = await db.Players.AsNoTracking().FirstOrDefaultAsync(p => p.Id == playerId, ct)
             ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy người chơi.", HttpStatusCode.NotFound);
 
-        var higherCount = await db.Players
-            .AsNoTracking()
-            .CountAsync(p => p.ArenaRating > me.ArenaRating, ct);
+        var myRank = await leaderboardStore.GetRankAsync(playerId, me.ArenaRating, ct);
+        var topScores = await leaderboardStore.GetTopAsync(safeTop, ct);
 
-        var topRows = await db.Players
+        var topIds = topScores.Select(x => x.PlayerId).ToList();
+        var playerMap = await db.Players
             .AsNoTracking()
-            .OrderByDescending(p => p.ArenaRating)
-            .ThenByDescending(p => p.ArenaWins)
-            .Take(safeTop)
-            .ToListAsync(ct);
+            .Where(p => topIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, ct);
 
-        var entries = topRows.Select((p, idx) => new LeaderboardEntryDto(
-            Rank: idx + 1,
-            PlayerId: p.Id,
-            Nickname: p.Nickname,
-            Level: p.Level,
-            ArenaRating: p.ArenaRating,
-            Wins: p.ArenaWins,
-            Losses: p.ArenaLosses)).ToList();
+        var entries = new List<LeaderboardEntryDto>(topScores.Count);
+        for (var i = 0; i < topScores.Count; i++)
+        {
+            var (pid, score) = topScores[i];
+            if (!playerMap.TryGetValue(pid, out var p)) continue;
+
+            entries.Add(new LeaderboardEntryDto(
+                Rank: i + 1,
+                PlayerId: p.Id,
+                Nickname: p.Nickname,
+                Level: p.Level,
+                ArenaRating: score,
+                Wins: p.ArenaWins,
+                Losses: p.ArenaLosses));
+        }
 
         return new ArenaLeaderboardResponse(
-            MyRank: higherCount + 1,
+            MyRank: myRank,
             MyRating: me.ArenaRating,
             MyWins: me.ArenaWins,
             MyLosses: me.ArenaLosses,
@@ -248,6 +254,13 @@ public sealed class ArenaService(
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+
+        // Đồng bộ điểm Elo mới lên Redis ZSET (nếu đang bật Redis)
+        await leaderboardStore.UpdateScoreAsync(attacker.Id, attacker.ArenaRating, ct);
+        if (defenderPlayer is not null)
+        {
+            await leaderboardStore.UpdateScoreAsync(defenderPlayer.Id, defenderPlayer.ArenaRating, ct);
+        }
 
         return new ArenaChallengeResponse(
             DefenderName: defenderName,
