@@ -74,6 +74,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Phục vụ giao diện game test HTML trong thư mục wwwroot/ (mở tại http://localhost:5098/)
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
