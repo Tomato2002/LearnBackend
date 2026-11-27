@@ -1,4 +1,4 @@
-using LearnBackend.Common.DTOs;
+using LearnBackend.Shared.Contracts;
 using LearnBackend.Common.Extensions;
 using LearnBackend.Modules.Hero.DTOs;
 using Microsoft.AspNetCore.Authorization;

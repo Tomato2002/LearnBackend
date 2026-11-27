@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.Json;
-using LearnBackend.Common.DTOs;
+using LearnBackend.Shared.Contracts;
 using LearnBackend.Common.Exceptions;
 
 namespace LearnBackend.Common.Middleware;

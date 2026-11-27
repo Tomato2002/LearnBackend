@@ -285,6 +285,7 @@
       <!-- Tabs -->
       <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="stages" onclick="switchTab('stages')">⚔️ Chiến Dịch</button>
+        <button class="nav-tab" data-tab="liveops" onclick="switchTab('liveops')">🎁 LiveOps</button>
         <button class="nav-tab" data-tab="arena" onclick="switchTab('arena')">🏆 Đấu Trường</button>
         <button class="nav-tab" data-tab="guild" onclick="switchTab('guild')">🏰 Bang Hội</button>
         <button class="nav-tab" data-tab="chat" onclick="switchTab('chat')">💬 Chat Live</button>
@@ -302,6 +303,16 @@
       <div id="panel-stages">
         <div class="grid" id="stagesGrid"></div>
         <div id="battleResultPanel" class="battle-panel hidden"></div>
+      </div>
+
+      <!-- TAB: LIVEOPS (DAILY BONUS + HOURLY CHEST + HOT FEATURE FLAGS) -->
+      <div id="panel-liveops" class="hidden">
+        <div class="grid" style="margin-bottom:18px;">
+          <div class="card" id="hourlyBonusCard"></div>
+          <div class="card" id="liveOpsFlagsCard"></div>
+        </div>
+        <div class="section-title">📅 Điểm Danh 7 Ngày (Daily Login Bonus)</div>
+        <div class="grid" id="dailyBonusGrid"></div>
       </div>
 
       <!-- TAB: ARENA PvP -->
@@ -1354,11 +1365,126 @@
       } catch { /* handled */ }
     }
 
+    // --- Stage 5: LiveOps (Bootstrap, Daily 7-Day Bonus, Hourly Chest, Hot Feature Flags) ---
+    let currentFeatureFlags = null;
+
+    async function loadLiveOps() {
+      try {
+        const bootstrap = await apiFetch('GET', '/api/liveops/bootstrap', null, false);
+        currentFeatureFlags = bootstrap.featureFlags;
+        renderLiveOpsFlags(bootstrap);
+
+        if (currentFeatureFlags.maintenanceMode) return;
+
+        const [daily, hourly] = await Promise.all([
+          apiFetch('GET', '/api/liveops/daily-bonus'),
+          apiFetch('GET', '/api/liveops/hourly-bonus')
+        ]);
+        renderHourlyBonus(hourly);
+        renderDailyBonus(daily);
+      } catch { /* handled */ }
+    }
+
+    function renderHourlyBonus(h) {
+      const card = document.getElementById('hourlyBonusCard');
+      const mins = Math.ceil((h.cooldownSecondsRemaining || 0) / 60);
+      card.innerHTML = `
+        <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+          <strong>⏱️ Rương Quà Theo Giờ (Hourly Bonus)</strong>
+          <span class="badge ${h.canClaimNow ? 'badge-ok' : 'badge-info'}">${h.canClaimNow ? 'Sẵn sàng!' : `Còn ~${mins} phút`}</span>
+        </div>
+        <p class="muted" style="font-size:12px; margin-bottom:12px;">Hồi tự động mỗi 60 phút (Lazy UTC Timestamp). Thưởng: <strong>+${h.rewardGold} 🪙, +${h.rewardGems} 💎</strong>.</p>
+        <button class="btn-gold" ${!h.canClaimNow ? 'disabled' : ''} onclick="claimHourlyBonus()">
+          ${h.canClaimNow ? '🎁 Mở Rương Ngay' : `⏳ Đang hồi (${h.cooldownSecondsRemaining}s)`}
+        </button>`;
+    }
+
+    function renderDailyBonus(d) {
+      const grid = document.getElementById('dailyBonusGrid');
+      grid.innerHTML = d.schedule.map(day => {
+        const isPast = day.day <= d.currentStreakDay && !(d.currentStreakDay === 7 && d.canClaimToday);
+        const isNext = day.day === d.nextClaimDay;
+        return `
+          <div class="game-card" style="${isNext && d.canClaimToday ? 'border-color:var(--gold); background:rgba(245,185,66,0.08);' : ''}">
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                <strong>Ngày ${day.day}</strong>
+                <span class="badge ${isPast ? 'badge-ok' : isNext ? 'badge-gold' : 'badge-info'}">
+                  ${isPast ? 'Đã nhận' : isNext ? (d.canClaimToday ? 'Có thể nhận!' : 'Ngày mai') : 'Khóa'}
+                </span>
+              </div>
+              <div class="row">
+                <span class="badge badge-gold">+${day.gold} 🪙</span>
+                <span class="badge badge-info">+${day.gems} 💎</span>
+                ${day.itemId ? `<span class="badge badge-ok">+${day.itemQty} ${escapeHtml(day.itemId)}</span>` : ''}
+              </div>
+            </div>
+            ${isNext ? `<button class="btn-emerald" ${!d.canClaimToday ? 'disabled' : ''} onclick="claimDailyBonus()">${d.canClaimToday ? '✅ Điểm Danh Ngay' : 'Đã điểm danh hôm nay'}</button>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    function renderLiveOpsFlags(bootstrap) {
+      const f = bootstrap.featureFlags;
+      const card = document.getElementById('liveOpsFlagsCard');
+      const items = [
+        ['maintenanceMode', '🛑 Bảo Trì Toàn Server'],
+        ['enableBattle', '⚔️ Chiến Dịch (Battle)'],
+        ['enableGacha', '🌟 Triệu Hồi (Gacha)'],
+        ['enableShop', '🛒 Cửa Hàng (Shop)'],
+        ['enableArena', '🏆 Đấu Trường (Arena)'],
+        ['enableGuild', '🏰 Bang Hội (Guild)']
+      ];
+      card.innerHTML = `
+        <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+          <strong>🎛️ GM LiveOps Feature Flags (Tắt/Mở Nóng)</strong>
+          <span class="badge badge-info">v${escapeHtml(bootstrap.masterDataVersion)}</span>
+        </div>
+        <p class="muted" style="font-size:12px; margin-bottom:10px;">Thử tắt <strong>Gacha</strong> rồi sang tab Gacha bấm quay → server chặn ngay <code>503 FEATURE_DISABLED</code> không cần restart!</p>
+        <div class="row" style="gap:8px;">
+          ${items.map(([key, label]) => `
+            <button class="${f[key] ? (key === 'maintenanceMode' ? 'btn-danger' : 'btn-emerald') : 'btn-ghost'}"
+              style="font-size:12px; padding:6px 10px;"
+              onclick="toggleLiveOpsFlag('${key}')">
+              ${label}: ${f[key] ? 'BẬT' : 'TẮT'}
+            </button>`).join('')}
+        </div>`;
+    }
+
+    async function toggleLiveOpsFlag(key) {
+      if (!currentFeatureFlags) return;
+      const next = { ...currentFeatureFlags, [key]: !currentFeatureFlags[key] };
+      try {
+        await apiFetch('POST', '/api/liveops/flags', next);
+        showToast(`Đã cập nhật công tắc ${key} = ${next[key]}!`, 'ok');
+        await loadLiveOps();
+      } catch { /* handled */ }
+    }
+
+    async function claimDailyBonus() {
+      try {
+        const res = await apiFetch('POST', '/api/liveops/daily-bonus/claim');
+        showToast(`Điểm danh Ngày ${res.claimedDay} thành công! +${res.goldEarned} Gold, +${res.gemsEarned} Gems`, 'ok');
+        await loadLiveOps();
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
+    async function claimHourlyBonus() {
+      try {
+        const res = await apiFetch('POST', '/api/liveops/hourly-bonus/claim');
+        showToast(`Mở Rương Theo Giờ thành công! +${res.goldEarned} Gold, +${res.gemsEarned} Gems`, 'ok');
+        await loadLiveOps();
+        await refreshAll();
+      } catch { /* handled */ }
+    }
+
     function switchTab(tab) {
       document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-      ['stages', 'arena', 'guild', 'chat', 'gacha', 'shop', 'quests', 'mail', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
+      ['stages', 'liveops', 'arena', 'guild', 'chat', 'gacha', 'shop', 'quests', 'mail', 'heroes', 'inventory', 'lua', 'ledger'].forEach(t => {
         document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
       });
+      if (tab === 'liveops') loadLiveOps();
       if (tab === 'arena') loadArena();
       if (tab === 'guild') loadGuild();
       if (tab === 'ledger') loadLedger();

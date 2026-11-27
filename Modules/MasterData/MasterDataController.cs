@@ -1,4 +1,4 @@
-using LearnBackend.Common.DTOs;
+using LearnBackend.Shared.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LearnBackend.Modules.MasterData;

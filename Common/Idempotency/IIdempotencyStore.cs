@@ -7,11 +7,11 @@ public sealed record IdempotentResponseRecord(
     DateTime CachedAtUtc);
 
 /// <summary>
-/// Lưu trữ kết quả các request có gắn header X-Idempotency-Key.
-/// Tách Interface để sau này scale nhiều server chỉ cần thay bằng Redis.
+/// Lưu trữ kết quả các request gắn header X-Idempotency-Key hoàn toàn bất đồng bộ (Async).
+/// Tránh chặn ThreadPool khi dùng Redis ở quy mô 10k+ CCU.
 /// </summary>
 public interface IIdempotencyStore
 {
-    bool TryGet(string compositeKey, out IdempotentResponseRecord? record);
-    void Set(string compositeKey, IdempotentResponseRecord record, TimeSpan ttl);
+    Task<IdempotentResponseRecord?> GetAsync(string compositeKey, CancellationToken ct = default);
+    Task SetAsync(string compositeKey, IdempotentResponseRecord record, TimeSpan ttl, CancellationToken ct = default);
 }

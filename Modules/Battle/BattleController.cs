@@ -1,4 +1,4 @@
-using LearnBackend.Common.DTOs;
+using LearnBackend.Shared.Contracts;
 using LearnBackend.Common.Extensions;
 using LearnBackend.Modules.Battle.DTOs;
 using LearnBackend.Modules.Battle.Engine;

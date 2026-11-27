@@ -4,6 +4,7 @@ using LearnBackend.Modules.Gacha.Entities;
 using LearnBackend.Modules.Guild.Entities;
 using LearnBackend.Modules.Hero.Entities;
 using LearnBackend.Modules.Inventory.Entities;
+using LearnBackend.Modules.LiveOps.Entities;
 using LearnBackend.Modules.Mail.Entities;
 using LearnBackend.Modules.Player.Entities;
 using LearnBackend.Modules.Quest.Entities;
@@ -34,6 +35,10 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<ArenaMatchHistory> ArenaMatchHistories => Set<ArenaMatchHistory>();
     public DbSet<Guild> Guilds => Set<Guild>();
     public DbSet<GuildMember> GuildMembers => Set<GuildMember>();
+
+    // Stage 5 LiveOps Retention Tables
+    public DbSet<PlayerDailyBonus> PlayerDailyBonuses => Set<PlayerDailyBonus>();
+    public DbSet<PlayerHourlyBonus> PlayerHourlyBonuses => Set<PlayerHourlyBonus>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -164,6 +169,19 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             entity.Property(x => x.Role).HasMaxLength(16).IsRequired();
             entity.HasIndex(x => x.PlayerId).IsUnique(); // Mỗi người chơi chỉ vào 1 Bang
             entity.HasIndex(x => x.GuildId);
+        });
+
+        modelBuilder.Entity<PlayerDailyBonus>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.LastClaimedDateUtc).HasMaxLength(16);
+            entity.HasIndex(x => x.PlayerId).IsUnique();
+        });
+
+        modelBuilder.Entity<PlayerHourlyBonus>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.PlayerId).IsUnique();
         });
     }
 }

@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LearnBackend", "LearnBacken
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LearnBackend.Tests", "LearnBackend.Tests\LearnBackend.Tests.csproj", "{1F7A44B7-FAC1-4ECD-990D-48FFC5212EDA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LearnBackend.Shared", "LearnBackend.Shared\LearnBackend.Shared.csproj", "{5D765D63-6127-429F-A9FA-E4938BA7626D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{1F7A44B7-FAC1-4ECD-990D-48FFC5212EDA}.Release|x64.Build.0 = Release|Any CPU
 		{1F7A44B7-FAC1-4ECD-990D-48FFC5212EDA}.Release|x86.ActiveCfg = Release|Any CPU
 		{1F7A44B7-FAC1-4ECD-990D-48FFC5212EDA}.Release|x86.Build.0 = Release|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Debug|x64.Build.0 = Debug|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Debug|x86.Build.0 = Debug|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Release|x64.ActiveCfg = Release|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Release|x64.Build.0 = Release|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Release|x86.ActiveCfg = Release|Any CPU
+		{5D765D63-6127-429F-A9FA-E4938BA7626D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

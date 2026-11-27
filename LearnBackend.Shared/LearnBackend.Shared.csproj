@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- .NET Standard 2.1: tương thích 100% để copy DLL hoặc kéo source trực tiếp vào Unity Client! -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+
+</Project>

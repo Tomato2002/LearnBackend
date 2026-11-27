@@ -1,4 +1,4 @@
-using LearnBackend.Common.DTOs;
+using LearnBackend.Shared.Contracts;
 using LearnBackend.Modules.Auth.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

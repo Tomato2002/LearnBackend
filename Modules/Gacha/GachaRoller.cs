@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using LearnBackend.Modules.MasterData.Models;
 
 namespace LearnBackend.Modules.Gacha;
@@ -9,7 +10,9 @@ public sealed record GachaRollOutcome(
     int NewPityCounter);
 
 /// <summary>
-/// Thuật toán Weighted Random + Soft Pity + Hard Pity thuần túy (dễ viết Unit Test).
+/// Thuật toán Weighted Random + Soft Pity + Hard Pity chuẩn Production:
+/// - Production gọi RollSingleCrypto() sử dụng RandomNumberGenerator (CSPRNG không thể đoán seed).
+/// - Unit Test gọi RollSingle(..., Random rng) để kiểm thử tất định.
 /// </summary>
 public static class GachaRoller
 {
@@ -29,34 +32,47 @@ public static class GachaRoller
         return banner.BaseFiveStarRate;
     }
 
+    public static GachaRollOutcome RollSingleCrypto(BannerConfig banner, int currentPityCounter)
+    {
+        var roll = RandomNumberGenerator.GetInt32(0, 1_000_000) / 1_000_000.0;
+        return RollCore(banner, currentPityCounter, roll, count => RandomNumberGenerator.GetInt32(0, count));
+    }
+
     public static GachaRollOutcome RollSingle(BannerConfig banner, int currentPityCounter, Random rng)
+    {
+        return RollCore(banner, currentPityCounter, rng.NextDouble(), count => rng.Next(count));
+    }
+
+    private static GachaRollOutcome RollCore(
+        BannerConfig banner,
+        int currentPityCounter,
+        double roll,
+        Func<int, int> pickIndex)
     {
         var nextPullNumber = currentPityCounter + 1;
         var fiveStarRate = CalculateFiveStarRate(banner, nextPullNumber);
         var isHardPity = nextPullNumber >= banner.HardPity;
 
-        var roll = rng.NextDouble();
-
         if (isHardPity || roll < fiveStarRate)
         {
-            var heroId = PickRandom(banner.FiveStarHeroIds, rng);
+            var heroId = PickRandom(banner.FiveStarHeroIds, pickIndex);
             return new GachaRollOutcome(heroId, Rarity: 5, WasPityTriggered: isHardPity, NewPityCounter: 0);
         }
 
         if (roll < fiveStarRate + banner.BaseFourStarRate)
         {
-            var heroId = PickRandom(banner.FourStarHeroIds, rng);
+            var heroId = PickRandom(banner.FourStarHeroIds, pickIndex);
             return new GachaRollOutcome(heroId, Rarity: 4, WasPityTriggered: false, NewPityCounter: nextPullNumber);
         }
 
-        var threeStarId = PickRandom(banner.ThreeStarHeroIds, rng);
+        var threeStarId = PickRandom(banner.ThreeStarHeroIds, pickIndex);
         return new GachaRollOutcome(threeStarId, Rarity: 3, WasPityTriggered: false, NewPityCounter: nextPullNumber);
     }
 
-    private static string PickRandom(List<string> pool, Random rng)
+    private static string PickRandom(List<string> pool, Func<int, int> pickIndex)
     {
         if (pool.Count == 0)
             throw new InvalidOperationException("Gacha pool không được rỗng.");
-        return pool[rng.Next(pool.Count)];
+        return pool[pickIndex(pool.Count)];
     }
 }

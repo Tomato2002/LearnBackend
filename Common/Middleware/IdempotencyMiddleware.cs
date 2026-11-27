@@ -3,12 +3,6 @@ using LearnBackend.Common.Idempotency;
 
 namespace LearnBackend.Common.Middleware;
 
-/// <summary>
-/// Chống trừ tiền / nạp thể lực / cường hóa 2 lần khi mạng mobile lag và Unity Client retry cùng 1 request.
-/// - Đặt SAU PlayerLockMiddleware để đảm bảo mỗi PlayerId chạy tuần tự.
-/// - Client gửi header: X-Idempotency-Key: &lt;guid&gt; cho các request POST/PUT/PATCH/DELETE.
-/// - Nếu key đã được xử lý thành công (2xx) trong 10 phút gần nhất -> trả lại kết quả cũ kèm header X-Idempotency-Replayed: true.
-/// </summary>
 public sealed class IdempotencyMiddleware(RequestDelegate next)
 {
     public const string HeaderName = "X-Idempotency-Key";
@@ -44,7 +38,8 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
 
         var compositeKey = $"idem:{scopePrefix}:{context.Request.Method}:{context.Request.Path}:{idempotencyKey}";
 
-        if (store.TryGet(compositeKey, out var cached) && cached is not null)
+        var cached = await store.GetAsync(compositeKey, context.RequestAborted);
+        if (cached is not null)
         {
             context.Response.StatusCode = cached.StatusCode;
             context.Response.ContentType = cached.ContentType;
@@ -53,7 +48,6 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
             return;
         }
 
-        // Bắt nội dung response để lưu cache nếu thành công (2xx)
         var originalBodyStream = context.Response.Body;
         await using var buffer = new MemoryStream();
         context.Response.Body = buffer;
@@ -74,7 +68,7 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
                     Body: responseBody,
                     CachedAtUtc: DateTime.UtcNow);
 
-                store.Set(compositeKey, record, CacheTtl);
+                await store.SetAsync(compositeKey, record, CacheTtl, context.RequestAborted);
             }
 
             buffer.Position = 0;

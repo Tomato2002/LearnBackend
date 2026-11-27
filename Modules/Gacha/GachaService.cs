@@ -142,12 +142,11 @@ public sealed class GachaService(
             .ToListAsync(ct))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var rng = new Random(RandomNumberGenerator.GetInt32(int.MaxValue));
         var results = new List<GachaPullItemDto>(request.Count);
 
         for (var i = 0; i < request.Count; i++)
         {
-            var outcome = GachaRoller.RollSingle(banner, pityState.PityCounter, rng);
+            var outcome = GachaRoller.RollSingleCrypto(banner, pityState.PityCounter);
             pityState.PityCounter = outcome.NewPityCounter;
             pityState.TotalPulls += 1;
 

@@ -122,5 +122,17 @@ Content-Type: application/json
 POST {{baseUrl}}/api/guilds/boss/attack
 Authorization: Bearer {{token}}
 
+### 22. LiveOps Bootstrap (Dynamic Discovery + Feature Flags + Maintenance + ServerTimeUtc)
+GET {{baseUrl}}/api/liveops/bootstrap
+
+### 23. Điểm Danh 7 Ngày (Daily Bonus)
+POST {{baseUrl}}/api/liveops/daily-bonus/claim
+Authorization: Bearer {{token}}
+
+### 24. Mở Rương Quà Theo Giờ (Hourly Bonus — Lazy 60m cooldown)
+POST {{baseUrl}}/api/liveops/hourly-bonus/claim
+Authorization: Bearer {{token}}
+
+
 
 

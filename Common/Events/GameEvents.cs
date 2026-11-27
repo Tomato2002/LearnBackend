@@ -16,13 +16,15 @@ public interface IGameEventHandler<in TEvent> where TEvent : IGameEvent
 
 /// <summary>
 /// Event Bus nội bộ giúp các module giao tiếp lỏng lẻo (Decoupled):
-/// Battle/Gacha/Shop chỉ việc Publish event, Quest/Achievement/BattlePass tự lắng nghe xử lý.
+/// - Auth chỉ bắn PlayerRegisteredEvent -> từng game tự cắm Handler tặng quà tân thủ (RPG tặng Hero, Card tặng Bộ bài...).
+/// - Battle/Gacha/Shop chỉ bắn sự kiện -> Quest/Achievement/BattlePass tự lắng nghe xử lý.
 /// </summary>
 public interface IGameEventBus
 {
     Task PublishAsync<TEvent>(TEvent gameEvent, CancellationToken ct = default) where TEvent : IGameEvent;
 }
 
+public sealed record PlayerRegisteredEvent(Guid PlayerId, DateTime OccurredAtUtc) : IGameEvent;
 public sealed record StageClearedEvent(Guid PlayerId, string StageId, DateTime OccurredAtUtc) : IGameEvent;
 public sealed record GachaSummonedEvent(Guid PlayerId, string BannerId, int PullCount, DateTime OccurredAtUtc) : IGameEvent;
 public sealed record ShopPurchasedEvent(Guid PlayerId, string ShopItemId, int Quantity, DateTime OccurredAtUtc) : IGameEvent;
