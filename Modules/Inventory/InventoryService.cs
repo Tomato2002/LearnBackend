@@ -101,11 +101,6 @@ public sealed class InventoryService(GameDbContext db, MasterDataStore masterDat
 
         var (stoneCost, goldCost) = GetEnhanceCost(equipment.EnhanceLevel);
 
-        if (player.Gold < goldCost)
-        {
-            throw new GameException("INSUFFICIENT_GOLD", $"Cần {goldCost} Gold để cường hóa (hiện có {player.Gold}).");
-        }
-
         var stoneItem = await db.InventoryItems
             .FirstOrDefaultAsync(i => i.PlayerId == playerId && i.ItemId == "stone_enhance", ct);
 
@@ -117,26 +112,19 @@ public sealed class InventoryService(GameDbContext db, MasterDataStore masterDat
                 $"Cần {stoneCost} Đá Cường Hóa để nâng cấp (hiện có {have}).");
         }
 
-        player.Gold -= goldCost;
         stoneItem.Quantity -= stoneCost;
         equipment.EnhanceLevel += 1;
 
-        // Tăng chỉ số trang bị theo cấp cường hóa
         var cfg = masterData.Items.GetValueOrDefault(equipment.TemplateId);
         equipment.BonusAtk += Math.Max(2, (int)Math.Ceiling((cfg?.BaseAtkBonus ?? 10) * 0.20));
         equipment.BonusHp += Math.Max(10, (int)Math.Ceiling((cfg?.BaseHpBonus ?? 50) * 0.20));
         equipment.BonusDef += Math.Max(1, (int)Math.Ceiling((cfg?.BaseDefBonus ?? 5) * 0.20));
 
-        db.CurrencyLedgers.Add(new CurrencyLedger
-        {
-            PlayerId = playerId,
-            CurrencyType = "Gold",
-            Delta = -goldCost,
-            BalanceAfter = player.Gold,
-            Reason = "EquipmentEnhance",
-            ReferenceId = $"{equipment.TemplateId}:+{equipment.EnhanceLevel}",
-            CreatedAtUtc = DateTime.UtcNow
-        });
+        db.CurrencyLedgers.Add(player.SpendGold(
+            goldCost,
+            reason: "EquipmentEnhance",
+            nowUtc: DateTime.UtcNow,
+            referenceId: $"{equipment.TemplateId}:+{equipment.EnhanceLevel}"));
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

@@ -102,21 +102,12 @@ public sealed class ShopService(
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId, ct)
             ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy người chơi.", HttpStatusCode.NotFound);
 
-        long balanceAfter;
-        if (string.Equals(shopItem.CurrencyType, "Gems", StringComparison.OrdinalIgnoreCase))
-        {
-            if (player.Gems < totalCost)
-                throw new GameException("INSUFFICIENT_GEMS", $"Cần {totalCost} Gems (hiện có {player.Gems}).");
-            player.Gems -= totalCost;
-            balanceAfter = player.Gems;
-        }
-        else
-        {
-            if (player.Gold < totalCost)
-                throw new GameException("INSUFFICIENT_GOLD", $"Cần {totalCost} Gold (hiện có {player.Gold}).");
-            player.Gold -= totalCost;
-            balanceAfter = player.Gold;
-        }
+        var ledger = string.Equals(shopItem.CurrencyType, "Gems", StringComparison.OrdinalIgnoreCase)
+            ? player.SpendGems(totalCost, "ShopPurchase", nowUtc, $"{shopItem.Id}x{request.Quantity}")
+            : player.SpendGold(totalCost, "ShopPurchase", nowUtc, $"{shopItem.Id}x{request.Quantity}");
+
+        var balanceAfter = ledger.BalanceAfter;
+        db.CurrencyLedgers.Add(ledger);
 
         if (purchase is null)
         {
@@ -133,17 +124,6 @@ public sealed class ShopService(
         {
             purchase.PurchasedCount += request.Quantity;
         }
-
-        db.CurrencyLedgers.Add(new CurrencyLedger
-        {
-            PlayerId = playerId,
-            CurrencyType = shopItem.CurrencyType,
-            Delta = -totalCost,
-            BalanceAfter = balanceAfter,
-            Reason = "ShopPurchase",
-            ReferenceId = $"{shopItem.Id}x{request.Quantity}",
-            CreatedAtUtc = nowUtc
-        });
 
         var totalGrantQty = shopItem.RewardQuantity * request.Quantity;
         if (string.Equals(rewardCfg.Category, "Equipment", StringComparison.OrdinalIgnoreCase))

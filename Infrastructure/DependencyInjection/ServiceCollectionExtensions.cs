@@ -191,7 +191,8 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddRpgGameModules(this IServiceCollection services)
     {
-        // Combat Engine + Sandboxed Lua Skill Runner (MoonSharp VM Object Pool)
+        // Combat Engine + Sandboxed Lua Skill Runner (Decoupled via ISkillScriptProvider + VM Object Pool)
+        services.AddSingleton<ISkillScriptProvider, Infrastructure.Scripts.FileSkillScriptProvider>();
         services.AddSingleton<LuaSkillRunner>();
         services.AddSingleton<TurnBasedCombatEngine>();
 

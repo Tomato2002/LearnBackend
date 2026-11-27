@@ -87,11 +87,6 @@ public sealed class HeroService(GameDbContext db, MasterDataStore masterData)
 
         var (potionCost, goldCost) = HeroStatCalculator.GetLevelUpCost(hero.Level);
 
-        if (player.Gold < goldCost)
-        {
-            throw new GameException("INSUFFICIENT_GOLD", $"Cần {goldCost} Gold để nâng cấp Hero (hiện có {player.Gold}).");
-        }
-
         var potionItem = await db.InventoryItems
             .FirstOrDefaultAsync(i => i.PlayerId == playerId && i.ItemId == "potion_exp_small", ct);
 
@@ -103,20 +98,13 @@ public sealed class HeroService(GameDbContext db, MasterDataStore masterData)
                 $"Cần {potionCost} Bình Kinh Nghiệm Nhỏ để nâng cấp (hiện có {have}).");
         }
 
-        player.Gold -= goldCost;
-        potionItem.Quantity -= potionCost;
         hero.Level += 1;
-
-        db.CurrencyLedgers.Add(new CurrencyLedger
-        {
-            PlayerId = playerId,
-            CurrencyType = "Gold",
-            Delta = -goldCost,
-            BalanceAfter = player.Gold,
-            Reason = "HeroLevelUp",
-            ReferenceId = $"{hero.HeroTemplateId}:Lv{hero.Level}",
-            CreatedAtUtc = DateTime.UtcNow
-        });
+        potionItem.Quantity -= potionCost;
+        db.CurrencyLedgers.Add(player.SpendGold(
+            goldCost,
+            reason: "HeroLevelUp",
+            nowUtc: DateTime.UtcNow,
+            referenceId: $"{hero.HeroTemplateId}:Lv{hero.Level}"));
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

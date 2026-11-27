@@ -104,35 +104,18 @@ public sealed class GachaService(
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId, ct)
             ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy người chơi.", HttpStatusCode.NotFound);
 
-        if (player.Gems < totalCost)
-        {
-            throw new GameException("INSUFFICIENT_GEMS", $"Cần {totalCost} Gems để quay {request.Count} lần (hiện có {player.Gems}).");
-        }
-
-        player.Gems -= totalCost;
-        db.CurrencyLedgers.Add(new CurrencyLedger
-        {
-            PlayerId = playerId,
-            CurrencyType = "Gems",
-            Delta = -totalCost,
-            BalanceAfter = player.Gems,
-            Reason = "GachaPull",
-            ReferenceId = $"{banner.Id}x{request.Count}",
-            CreatedAtUtc = nowUtc
-        });
+        db.CurrencyLedgers.Add(player.SpendGems(
+            totalCost,
+            reason: "GachaPull",
+            nowUtc: nowUtc,
+            referenceId: $"{banner.Id}x{request.Count}"));
 
         var pityState = await db.PlayerGachaPities
             .FirstOrDefaultAsync(p => p.PlayerId == playerId && p.BannerId == banner.Id, ct);
 
         if (pityState is null)
         {
-            pityState = new PlayerGachaPity
-            {
-                PlayerId = playerId,
-                BannerId = banner.Id,
-                PityCounter = 0,
-                TotalPulls = 0
-            };
+            pityState = PlayerGachaPity.Create(playerId, banner.Id);
             db.PlayerGachaPities.Add(pityState);
         }
 
@@ -147,8 +130,7 @@ public sealed class GachaService(
         for (var i = 0; i < request.Count; i++)
         {
             var outcome = GachaRoller.RollSingleCrypto(banner, pityState.PityCounter);
-            pityState.PityCounter = outcome.NewPityCounter;
-            pityState.TotalPulls += 1;
+            pityState.ApplyRollOutcome(outcome);
 
             var heroCfg = masterData.Heroes[outcome.HeroTemplateId];
             var isNew = ownedHeroIds.Add(outcome.HeroTemplateId);

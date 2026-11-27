@@ -10,10 +10,7 @@ public sealed record BattleSimulationResult(
     List<BattleTurnLogDto> Logs);
 
 /// <summary>
-/// Bộ mô phỏng chiến đấu theo lượt tất định (Deterministic Turn-Based Combat Engine):
-/// - Cùng Đội hình + Quái + Seed -> luôn cho ra kết quả giống nhau 100%.
-/// - Lượt đánh sắp xếp theo Speed giảm dần.
-/// - Mọi Skill đều chạy qua LuaSkillRunner (MoonSharp Sandbox).
+/// Bộ mô phỏng chiến đấu theo lượt tất định (Deterministic Turn-Based Combat Engine).
 /// </summary>
 public sealed class TurnBasedCombatEngine(LuaSkillRunner luaSkillRunner)
 {
@@ -33,7 +30,6 @@ public sealed class TurnBasedCombatEngine(LuaSkillRunner luaSkillRunner)
         {
             round++;
 
-            // Sắp xếp thứ tự ra đòn theo Speed giảm dần (bằng nhau thì ưu tiên phe Hero)
             var turnOrder = allUnits
                 .Where(u => u.IsAlive)
                 .OrderByDescending(u => u.Speed)
@@ -50,10 +46,7 @@ public sealed class TurnBasedCombatEngine(LuaSkillRunner luaSkillRunner)
                 var target = opponents.FirstOrDefault(o => o.IsAlive);
                 if (target is null) break;
 
-                actor.TurnCounter++;
-
-                // Cứ mỗi lượt chẵn (turn 2, 4, 6...) dùng tuyệt chiêu số 2 nếu có, lượt lẻ dùng chiêu cơ bản
-                var skillId = SelectSkill(actor);
+                var skillId = actor.AdvanceTurnAndSelectSkill();
 
                 var ctx = new LuaBattleContext(
                     round: round,
@@ -79,13 +72,5 @@ public sealed class TurnBasedCombatEngine(LuaSkillRunner luaSkillRunner)
             .ToList();
 
         return new BattleSimulationResult(isVictory, round, seed, summaries, logs);
-    }
-
-    private static string SelectSkill(CombatUnit actor)
-    {
-        if (actor.SkillIds.Count == 0) return "basic_attack";
-        if (actor.SkillIds.Count == 1) return actor.SkillIds[0];
-
-        return (actor.TurnCounter % 2 == 0) ? actor.SkillIds[1] : actor.SkillIds[0];
     }
 }

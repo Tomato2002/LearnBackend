@@ -36,27 +36,8 @@ public sealed class BattleService(
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId, ct)
             ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy người chơi.", HttpStatusCode.NotFound);
 
-        // 1. Đồng bộ & trừ Stamina (Server-Authoritative)
-        var maxStamina = rules.GetMaxStaminaForLevel(player.Level);
-        var staminaCalc = StaminaCalculator.Calculate(
-            player.StoredStamina,
-            player.LastStaminaUpdatedAtUtc,
-            maxStamina,
-            rules.StaminaRegenIntervalSeconds,
-            nowUtc);
-
-        if (staminaCalc.CurrentStamina < stage.StaminaCost)
-        {
-            throw new GameException(
-                "INSUFFICIENT_STAMINA",
-                $"Không đủ thể lực vào ải '{stage.Name}'! Cần {stage.StaminaCost}, hiện có {staminaCalc.CurrentStamina}.");
-        }
-
-        var wasAtOrAboveCap = staminaCalc.CurrentStamina >= maxStamina;
-        player.StoredStamina = staminaCalc.CurrentStamina - stage.StaminaCost;
-        player.LastStaminaUpdatedAtUtc = wasAtOrAboveCap && player.StoredStamina < maxStamina
-            ? nowUtc
-            : staminaCalc.UpdatedTimestampUtc;
+        // 1. Đồng bộ & trừ Stamina qua Rich Domain PlayerProfile
+        player.SpendStamina(stage.StaminaCost, rules, nowUtc);
 
         // 2. Lấy đội hình Hero + Trang bị đang mặc của Player
         var teamHeroes = await db.PlayerHeroes
@@ -85,18 +66,16 @@ public sealed class BattleService(
         {
             if (!masterData.Heroes.TryGetValue(h.HeroTemplateId, out var template)) continue;
             var stats = HeroStatCalculator.Calculate(template, h, gearByHero.GetValueOrDefault(h.Id) ?? []);
-            heroUnits.Add(new CombatUnit
-            {
-                Id = h.Id.ToString(),
-                Name = $"{template.Name.Split(' ')[0]} (Lv.{h.Level})",
-                Side = "Hero",
-                MaxHp = stats.MaxHp,
-                Hp = stats.MaxHp,
-                Atk = stats.Atk,
-                Def = stats.Def,
-                Speed = stats.Speed,
-                SkillIds = [.. template.SkillIds]
-            });
+            heroUnits.Add(new CombatUnit(
+                id: h.Id.ToString(),
+                name: $"{template.Name.Split(' ')[0]} (Lv.{h.Level})",
+                side: "Hero",
+                maxHp: stats.MaxHp,
+                initialHp: stats.MaxHp,
+                atk: stats.Atk,
+                def: stats.Def,
+                speed: stats.Speed,
+                skillIds: [.. template.SkillIds]));
         }
 
         // 3. Tạo đội hình Quái vật từ MasterData
@@ -107,18 +86,16 @@ public sealed class BattleService(
             if (!masterData.Enemies.TryGetValue(enemyId, out var enemyCfg)) continue;
 
             var suffix = stage.EnemyIds.Count > 1 ? $" #{i + 1}" : string.Empty;
-            enemyUnits.Add(new CombatUnit
-            {
-                Id = $"{enemyCfg.Id}_{i + 1}",
-                Name = $"{enemyCfg.Name}{suffix}",
-                Side = "Enemy",
-                MaxHp = enemyCfg.Hp,
-                Hp = enemyCfg.Hp,
-                Atk = enemyCfg.Atk,
-                Def = enemyCfg.Def,
-                Speed = enemyCfg.Speed,
-                SkillIds = [.. enemyCfg.SkillIds]
-            });
+            enemyUnits.Add(new CombatUnit(
+                id: $"{enemyCfg.Id}_{i + 1}",
+                name: $"{enemyCfg.Name}{suffix}",
+                side: "Enemy",
+                maxHp: enemyCfg.Hp,
+                initialHp: enemyCfg.Hp,
+                atk: enemyCfg.Atk,
+                def: enemyCfg.Def,
+                speed: enemyCfg.Speed,
+                skillIds: [.. enemyCfg.SkillIds]));
         }
 
         // 4. Chạy mô phỏng Turn-Based Combat với Lua Skills
@@ -127,43 +104,12 @@ public sealed class BattleService(
 
         BattleRewardsDto? rewards = null;
 
-        // 5. Nếu thắng -> Cộng Gold, EXP, lên Level, rớt đồ vào Inventory & ghi CurrencyLedger
+        // 5. Nếu thắng -> Cộng Gold (kèm sổ cái), EXP/LevelUp qua Rich Domain PlayerProfile & roll rớt đồ
         if (sim.IsVictory)
         {
-            player.Gold += stage.GoldReward;
-            player.Exp += stage.ExpReward;
+            db.CurrencyLedgers.Add(player.CreditGold(stage.GoldReward, "StageClear", nowUtc, stage.Id));
+            var levelsGained = player.AddExpAndLevelUp(stage.ExpReward, rules, nowUtc);
 
-            var levelsGained = 0;
-            while (player.Exp >= rules.GetExpToNextLevel(player.Level))
-            {
-                player.Exp -= rules.GetExpToNextLevel(player.Level);
-                player.Level++;
-                levelsGained++;
-            }
-
-            // Lên cấp thưởng hồi đầy Stamina theo MaxStamina mới
-            if (levelsGained > 0)
-            {
-                var newMax = rules.GetMaxStaminaForLevel(player.Level);
-                if (player.StoredStamina < newMax)
-                {
-                    player.StoredStamina = newMax;
-                    player.LastStaminaUpdatedAtUtc = nowUtc;
-                }
-            }
-
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = player.Id,
-                CurrencyType = "Gold",
-                Delta = stage.GoldReward,
-                BalanceAfter = player.Gold,
-                Reason = "StageClear",
-                ReferenceId = stage.Id,
-                CreatedAtUtc = nowUtc
-            });
-
-            // Roll vật phẩm rơi từ DropTable
             var lootRng = new Random(seed ^ 0x5F3759DF);
             var drops = await RollAndGrantDropsAsync(player.Id, stage.DropTable, lootRng, nowUtc, ct);
 
@@ -181,12 +127,7 @@ public sealed class BattleService(
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        var finalStamina = StaminaCalculator.Calculate(
-            player.StoredStamina,
-            player.LastStaminaUpdatedAtUtc,
-            rules.GetMaxStaminaForLevel(player.Level),
-            rules.StaminaRegenIntervalSeconds,
-            nowUtc);
+        var finalStamina = player.ComputeStamina(rules, nowUtc);
 
         var updatedProfile = new PlayerProfileResponse(
             PlayerId: player.Id,

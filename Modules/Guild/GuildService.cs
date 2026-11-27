@@ -210,82 +210,53 @@ public sealed class GuildService(
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId, ct)
                 ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy người chơi.", HttpStatusCode.NotFound);
 
-            // Trừ 10 Stamina
-            var maxStamina = rules.GetMaxStaminaForLevel(player.Level);
-            var stamina = StaminaCalculator.Calculate(
-                player.StoredStamina,
-                player.LastStaminaUpdatedAtUtc,
-                maxStamina,
-                rules.StaminaRegenIntervalSeconds,
-                nowUtc);
-
-            if (stamina.CurrentStamina < BossAttackStaminaCost)
-                throw new GameException("INSUFFICIENT_STAMINA", $"Cần {BossAttackStaminaCost} thể lực để đánh Guild Boss.");
-
-            var wasFull = stamina.CurrentStamina >= maxStamina;
-            player.StoredStamina = stamina.CurrentStamina - BossAttackStaminaCost;
-            player.LastStaminaUpdatedAtUtc = wasFull && player.StoredStamina < maxStamina
-                ? nowUtc
-                : stamina.UpdatedTimestampUtc;
+            // Trừ 10 Stamina qua Rich Domain PlayerProfile
+            player.SpendStamina(BossAttackStaminaCost, rules, nowUtc);
 
             // Mô phỏng đội hình đánh Guild Boss bằng Lua Skills
             var heroUnits = await BuildTeamUnitsAsync(playerId, ct);
             if (heroUnits.Count == 0)
                 throw new GameException("EMPTY_TEAM", "Đội hình ra trận đang trống.");
 
-            var bossUnit = new CombatUnit
-            {
-                Id = $"guild_boss_{guild.BossLevel}",
-                Name = guild.BossName,
-                Side = "Enemy",
-                MaxHp = guild.BossMaxHp,
-                Hp = guild.BossCurrentHp,
-                Atk = 140 + guild.BossLevel * 25,
-                Def = 60 + guild.BossLevel * 10,
-                Speed = 100,
-                SkillIds = ["enemy_bite", "skill_fireball"]
-            };
+            var bossUnit = new CombatUnit(
+                id: $"guild_boss_{guild.BossLevel}",
+                name: guild.BossName,
+                side: "Enemy",
+                maxHp: guild.BossMaxHp,
+                initialHp: guild.BossCurrentHp,
+                atk: 140 + guild.BossLevel * 25,
+                def: 60 + guild.BossLevel * 10,
+                speed: 100,
+                skillIds: ["enemy_bite", "skill_fireball"]);
 
             var seed = RandomNumberGenerator.GetInt32(100_000, int.MaxValue);
             var sim = combatEngine.Simulate(heroUnits, [bossUnit], seed);
 
             var damageDealt = Math.Max(1, guild.BossCurrentHp - bossUnit.Hp);
             guild.BossCurrentHp = Math.Max(0, guild.BossCurrentHp - damageDealt);
-            guild.BossVersion += 1; // Tăng version để kích hoạt kiểm tra Optimistic Concurrency!
+            guild.BossVersion += 1;
             membership.TotalBossDamage += damageDealt;
 
             var killedBoss = guild.BossCurrentHp == 0;
             var totalGold = ParticipationGold + (killedBoss ? LastHitBonusGold : 0);
             var bonusGems = killedBoss ? LastHitBonusGems : 0;
 
-            player.Gold += totalGold;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gold",
-                Delta = totalGold,
-                BalanceAfter = player.Gold,
-                Reason = killedBoss ? "GuildBossLastHit" : "GuildBossAttack",
-                ReferenceId = $"{guild.Name}:Lv{guild.BossLevel}",
-                CreatedAtUtc = nowUtc
-            });
+            var bossRef = $"{guild.Name}:Lv{guild.BossLevel}";
+            db.CurrencyLedgers.Add(player.CreditGold(
+                totalGold,
+                reason: killedBoss ? "GuildBossLastHit" : "GuildBossAttack",
+                nowUtc: nowUtc,
+                referenceId: bossRef));
 
             var defeatedBossName = guild.BossName;
             if (killedBoss)
             {
-                player.Gems += bonusGems;
-                db.CurrencyLedgers.Add(new CurrencyLedger
-                {
-                    PlayerId = playerId,
-                    CurrencyType = "Gems",
-                    Delta = bonusGems,
-                    BalanceAfter = player.Gems,
-                    Reason = "GuildBossLastHit",
-                    ReferenceId = $"{guild.Name}:Lv{guild.BossLevel}",
-                    CreatedAtUtc = nowUtc
-                });
+                db.CurrencyLedgers.Add(player.CreditGems(
+                    bonusGems,
+                    reason: "GuildBossLastHit",
+                    nowUtc: nowUtc,
+                    referenceId: bossRef));
 
-                // Hồi sinh Guild Boss cấp tiếp theo mạnh hơn!
                 guild.BossLevel += 1;
                 guild.BossMaxHp = 5000 + (guild.BossLevel - 1) * 3500;
                 guild.BossCurrentHp = guild.BossMaxHp;
@@ -346,18 +317,16 @@ public sealed class GuildService(
         {
             if (!masterData.Heroes.TryGetValue(h.HeroTemplateId, out var template)) continue;
             var stats = HeroStatCalculator.Calculate(template, h, gearByHero.GetValueOrDefault(h.Id) ?? []);
-            units.Add(new CombatUnit
-            {
-                Id = h.Id.ToString(),
-                Name = $"{template.Name.Split(' ')[0]} (Lv.{h.Level})",
-                Side = "Hero",
-                MaxHp = stats.MaxHp,
-                Hp = stats.MaxHp,
-                Atk = stats.Atk,
-                Def = stats.Def,
-                Speed = stats.Speed,
-                SkillIds = [.. template.SkillIds]
-            });
+            units.Add(new CombatUnit(
+                id: h.Id.ToString(),
+                name: $"{template.Name.Split(' ')[0]} (Lv.{h.Level})",
+                side: "Hero",
+                maxHp: stats.MaxHp,
+                initialHp: stats.MaxHp,
+                atk: stats.Atk,
+                def: stats.Def,
+                speed: stats.Speed,
+                skillIds: [.. template.SkillIds]));
         }
 
         return units;

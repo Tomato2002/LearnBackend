@@ -242,34 +242,10 @@ public sealed class LiveOpsService(GameDbContext db, LiveOpsFeatureStore feature
             ?? throw new GameException("PLAYER_NOT_FOUND", "Không tìm thấy người chơi.", HttpStatusCode.NotFound);
 
         if (gold > 0)
-        {
-            player.Gold += gold;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gold",
-                Delta = gold,
-                BalanceAfter = player.Gold,
-                Reason = reason,
-                ReferenceId = referenceId,
-                CreatedAtUtc = nowUtc
-            });
-        }
+            db.CurrencyLedgers.Add(player.CreditGold(gold, reason, nowUtc, referenceId));
 
         if (gems > 0)
-        {
-            player.Gems += gems;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gems",
-                Delta = gems,
-                BalanceAfter = player.Gems,
-                Reason = reason,
-                ReferenceId = referenceId,
-                CreatedAtUtc = nowUtc
-            });
-        }
+            db.CurrencyLedgers.Add(player.CreditGems(gems, reason, nowUtc, referenceId));
 
         if (!string.IsNullOrEmpty(itemId) && itemQty > 0)
         {

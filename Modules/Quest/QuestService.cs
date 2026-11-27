@@ -115,34 +115,10 @@ public sealed class QuestService(GameDbContext db, MasterDataStore masterData)
         entry.IsClaimed = true;
 
         if (questCfg.RewardGold > 0)
-        {
-            player.Gold += questCfg.RewardGold;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gold",
-                Delta = questCfg.RewardGold,
-                BalanceAfter = player.Gold,
-                Reason = "QuestReward",
-                ReferenceId = questCfg.Id,
-                CreatedAtUtc = nowUtc
-            });
-        }
+            db.CurrencyLedgers.Add(player.CreditGold(questCfg.RewardGold, "QuestReward", nowUtc, questCfg.Id));
 
         if (questCfg.RewardGems > 0)
-        {
-            player.Gems += questCfg.RewardGems;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gems",
-                Delta = questCfg.RewardGems,
-                BalanceAfter = player.Gems,
-                Reason = "QuestReward",
-                ReferenceId = questCfg.Id,
-                CreatedAtUtc = nowUtc
-            });
-        }
+            db.CurrencyLedgers.Add(player.CreditGems(questCfg.RewardGems, "QuestReward", nowUtc, questCfg.Id));
 
         if (!string.IsNullOrEmpty(questCfg.RewardItemId) && questCfg.RewardItemQty > 0)
         {

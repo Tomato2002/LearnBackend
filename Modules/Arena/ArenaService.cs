@@ -209,36 +209,16 @@ public sealed class ArenaService(
 
         var (attackerDelta, defenderDelta) = EloCalculator.Calculate(attacker.ArenaRating, defenderRating, sim.IsVictory);
         var ratingBefore = attacker.ArenaRating;
-        attacker.ArenaRating = Math.Max(100, attacker.ArenaRating + attackerDelta);
+        attacker.ApplyArenaResult(sim.IsVictory, attackerDelta);
 
         long goldEarned = 0;
         if (sim.IsVictory)
         {
-            attacker.ArenaWins++;
             goldEarned = WinGoldReward;
-            attacker.Gold += goldEarned;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = attacker.Id,
-                CurrencyType = "Gold",
-                Delta = goldEarned,
-                BalanceAfter = attacker.Gold,
-                Reason = "ArenaVictory",
-                ReferenceId = defenderName,
-                CreatedAtUtc = nowUtc
-            });
-        }
-        else
-        {
-            attacker.ArenaLosses++;
+            db.CurrencyLedgers.Add(attacker.CreditGold(goldEarned, "ArenaVictory", nowUtc, defenderName));
         }
 
-        if (defenderPlayer is not null)
-        {
-            defenderPlayer.ArenaRating = Math.Max(100, defenderPlayer.ArenaRating + defenderDelta);
-            if (sim.IsVictory) defenderPlayer.ArenaLosses++;
-            else defenderPlayer.ArenaWins++;
-        }
+        defenderPlayer?.ApplyArenaResult(!sim.IsVictory, defenderDelta);
 
         db.ArenaMatchHistories.Add(new ArenaMatchHistory
         {
@@ -296,18 +276,16 @@ public sealed class ArenaService(
         {
             if (!masterData.Heroes.TryGetValue(h.HeroTemplateId, out var template)) continue;
             var stats = HeroStatCalculator.Calculate(template, h, gearByHero.GetValueOrDefault(h.Id) ?? []);
-            units.Add(new CombatUnit
-            {
-                Id = h.Id.ToString(),
-                Name = $"{template.Name.Split(' ')[0]} (Lv.{h.Level})",
-                Side = side,
-                MaxHp = stats.MaxHp,
-                Hp = stats.MaxHp,
-                Atk = stats.Atk,
-                Def = stats.Def,
-                Speed = stats.Speed,
-                SkillIds = [.. template.SkillIds]
-            });
+            units.Add(new CombatUnit(
+                id: h.Id.ToString(),
+                name: $"{template.Name.Split(' ')[0]} (Lv.{h.Level})",
+                side: side,
+                maxHp: stats.MaxHp,
+                initialHp: stats.MaxHp,
+                atk: stats.Atk,
+                def: stats.Def,
+                speed: stats.Speed,
+                skillIds: [.. template.SkillIds]));
         }
 
         return units;
@@ -329,18 +307,16 @@ public sealed class ArenaService(
         {
             if (!masterData.Heroes.TryGetValue(tid, out var t)) continue;
             var hp = (int)(t.BaseHp * scale);
-            units.Add(new CombatUnit
-            {
-                Id = $"{botId}_{tid}",
-                Name = $"[Bot] {t.Name.Split(' ')[0]}",
-                Side = "Enemy",
-                MaxHp = hp,
-                Hp = hp,
-                Atk = (int)(t.BaseAtk * scale),
-                Def = (int)(t.BaseDef * scale),
-                Speed = t.BaseSpeed - 2,
-                SkillIds = [.. t.SkillIds]
-            });
+            units.Add(new CombatUnit(
+                id: $"{botId}_{tid}",
+                name: $"[Bot] {t.Name.Split(' ')[0]}",
+                side: "Enemy",
+                maxHp: hp,
+                initialHp: hp,
+                atk: (int)(t.BaseAtk * scale),
+                def: (int)(t.BaseDef * scale),
+                speed: t.BaseSpeed - 2,
+                skillIds: [.. t.SkillIds]));
         }
 
         return units;

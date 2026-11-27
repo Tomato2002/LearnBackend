@@ -85,35 +85,12 @@ public sealed class MailService(GameDbContext db)
             ClaimedAtUtc = nowUtc
         });
 
+        var mailRef = mail.Id.ToString("N")[..8];
         if (mail.RewardGold > 0)
-        {
-            player.Gold += mail.RewardGold;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gold",
-                Delta = mail.RewardGold,
-                BalanceAfter = player.Gold,
-                Reason = "GlobalMailClaim",
-                ReferenceId = mail.Id.ToString("N")[..8],
-                CreatedAtUtc = nowUtc
-            });
-        }
+            db.CurrencyLedgers.Add(player.CreditGold(mail.RewardGold, "GlobalMailClaim", nowUtc, mailRef));
 
         if (mail.RewardGems > 0)
-        {
-            player.Gems += mail.RewardGems;
-            db.CurrencyLedgers.Add(new CurrencyLedger
-            {
-                PlayerId = playerId,
-                CurrencyType = "Gems",
-                Delta = mail.RewardGems,
-                BalanceAfter = player.Gems,
-                Reason = "GlobalMailClaim",
-                ReferenceId = mail.Id.ToString("N")[..8],
-                CreatedAtUtc = nowUtc
-            });
-        }
+            db.CurrencyLedgers.Add(player.CreditGems(mail.RewardGems, "GlobalMailClaim", nowUtc, mailRef));
 
         if (!string.IsNullOrEmpty(mail.RewardItemId) && mail.RewardItemQty > 0)
         {

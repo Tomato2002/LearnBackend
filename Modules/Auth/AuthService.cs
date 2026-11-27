@@ -58,42 +58,11 @@ public sealed class AuthService(
             LastLoginAtUtc = nowUtc
         };
 
-        var player = new PlayerProfile
-        {
-            Id = Guid.NewGuid(),
-            UserAccountId = account.Id,
-            Nickname = nickname,
-            Level = 1,
-            Exp = 0,
-            Gold = rules.StarterGold,
-            Gems = rules.StarterGems,
-            StoredStamina = rules.GetMaxStaminaForLevel(1),
-            LastStaminaUpdatedAtUtc = nowUtc,
-            CreatedAtUtc = nowUtc
-        };
+        var (player, starterLedgers) = PlayerProfile.CreateNew(account.Id, nickname, rules, nowUtc);
 
         db.UserAccounts.Add(account);
         db.Players.Add(player);
-
-        db.CurrencyLedgers.AddRange(
-            new CurrencyLedger
-            {
-                PlayerId = player.Id,
-                CurrencyType = "Gold",
-                Delta = rules.StarterGold,
-                BalanceAfter = player.Gold,
-                Reason = "StarterBonus",
-                CreatedAtUtc = nowUtc
-            },
-            new CurrencyLedger
-            {
-                PlayerId = player.Id,
-                CurrencyType = "Gems",
-                Delta = rules.StarterGems,
-                BalanceAfter = player.Gems,
-                Reason = "StarterBonus",
-                CreatedAtUtc = nowUtc
-            });
+        db.CurrencyLedgers.AddRange(starterLedgers);
 
         var (rawRefresh, refreshHash, refreshExpiresAtUtc) = jwtTokenGenerator.GenerateRefreshToken();
         db.RefreshTokens.Add(new RefreshToken
