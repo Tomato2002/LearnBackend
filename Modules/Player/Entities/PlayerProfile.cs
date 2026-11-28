@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using LearnBackend.Common.Exceptions;
 using LearnBackend.Modules.MasterData.Models;
 using LearnBackend.Shared.Contracts;
@@ -7,6 +8,7 @@ namespace LearnBackend.Modules.Player.Entities;
 /// <summary>
 /// Rich Domain Entity cho Hồ sơ & Ví tiền người chơi:
 /// - Khóa cứng Gold, Gems, Level, Exp, StoredStamina, ArenaRating bằng private set.
+/// - Có [ConcurrencyCheck] WalletVersion làm chốt chặn Optimistic Concurrency cuối cùng ở tầng DB.
 /// - Mọi biến động tiền tệ BẮT BUỘC đi qua Spend/Credit -> tự kiểm tra không bao giờ âm tiền
 ///   và tự sinh ra CurrencyLedger (không thể quên ghi sổ cái kinh tế!).
 /// </summary>
@@ -28,6 +30,9 @@ public sealed class PlayerProfile
     public int ArenaRating { get; private set; } = 1000;
     public int ArenaWins { get; private set; }
     public int ArenaLosses { get; private set; }
+
+    [ConcurrencyCheck]
+    public int WalletVersion { get; private set; } = 1;
 
     public DateTime CreatedAtUtc { get; private set; }
 
@@ -70,6 +75,7 @@ public sealed class PlayerProfile
             throw new ArgumentOutOfRangeException(nameof(amount), "Số Gold cộng phải lớn hơn 0.");
 
         Gold += amount;
+        WalletVersion++;
         return BuildLedger("Gold", amount, Gold, reason, referenceId, nowUtc);
     }
 
@@ -86,6 +92,7 @@ public sealed class PlayerProfile
         }
 
         Gold -= amount;
+        WalletVersion++;
         return BuildLedger("Gold", -amount, Gold, reason, referenceId, nowUtc);
     }
 
@@ -95,6 +102,7 @@ public sealed class PlayerProfile
             throw new ArgumentOutOfRangeException(nameof(amount), "Số Gems cộng phải lớn hơn 0.");
 
         Gems += amount;
+        WalletVersion++;
         return BuildLedger("Gems", amount, Gems, reason, referenceId, nowUtc);
     }
 
@@ -111,6 +119,7 @@ public sealed class PlayerProfile
         }
 
         Gems -= amount;
+        WalletVersion++;
         return BuildLedger("Gems", -amount, Gems, reason, referenceId, nowUtc);
     }
 
@@ -142,6 +151,7 @@ public sealed class PlayerProfile
         LastStaminaUpdatedAtUtc = wasAtOrAboveCap && StoredStamina < synced.MaxStamina
             ? nowUtc
             : synced.UpdatedTimestampUtc;
+        WalletVersion++;
 
         return ComputeStamina(rules, nowUtc);
     }
@@ -183,6 +193,7 @@ public sealed class PlayerProfile
             }
         }
 
+        WalletVersion++;
         return levelsGained;
     }
 
@@ -191,6 +202,7 @@ public sealed class PlayerProfile
         ArenaRating = Math.Max(100, ArenaRating + ratingDelta);
         if (won) ArenaWins++;
         else ArenaLosses++;
+        WalletVersion++;
     }
 
     private CurrencyLedger BuildLedger(

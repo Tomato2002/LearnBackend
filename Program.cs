@@ -39,7 +39,7 @@ using (var scope = app.Services.CreateScope())
         var conn = db.Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='PlayerDailyBonuses';";
+        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Players') WHERE name='WalletVersion';";
         var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
         conn.Close();
 

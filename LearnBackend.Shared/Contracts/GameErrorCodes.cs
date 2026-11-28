@@ -9,6 +9,7 @@ namespace LearnBackend.Shared.Contracts
         public const string InternalServerError = "INTERNAL_SERVER_ERROR";
         public const string RateLimited = "RATE_LIMITED";
         public const string PlayerBusy = "PLAYER_BUSY";
+        public const string ConcurrencyConflict = "CONCURRENCY_CONFLICT";
         public const string ServerMaintenance = "SERVER_MAINTENANCE";
         public const string FeatureDisabled = "FEATURE_DISABLED";
 
