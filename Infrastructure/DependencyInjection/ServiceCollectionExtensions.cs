@@ -173,6 +173,7 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddSingleton<IGameRealtimeBroadcaster, SignalRGameBroadcaster>();
+        services.AddHostedService<Infrastructure.Outbox.OutboxProcessorWorker>();
 
         // Core Reusable Modules (dùng cho mọi thể loại game)
         services.AddScoped<AuthService>();

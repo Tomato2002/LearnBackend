@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
-using System.Security.Cryptography;
+using System.Text.Json;
 using LearnBackend.Common.Events;
 using LearnBackend.Common.Exceptions;
-using LearnBackend.Hubs;
+using LearnBackend.Infrastructure.Outbox;
 using LearnBackend.Infrastructure.Persistence;
 using LearnBackend.Modules.Gacha.Entities;
 using LearnBackend.Modules.Hero.Entities;
@@ -56,8 +56,7 @@ public sealed record GachaPullResponse(
 public sealed class GachaService(
     GameDbContext db,
     MasterDataStore masterData,
-    IGameEventBus eventBus,
-    IGameRealtimeBroadcaster broadcaster)
+    IGameEventBus eventBus)
 {
     public async Task<List<BannerStatusDto>> GetBannersAsync(Guid playerId, CancellationToken ct)
     {
@@ -179,21 +178,24 @@ public sealed class GachaService(
                 compensation));
         }
 
-        await db.SaveChangesAsync(ct);
+        // Ghi loa thông báo 5★ vào bảng OutboxMessages TRONG CÙNG DB TRANSACTION (Transactional Outbox Pattern)
+        foreach (var fiveStar in results.Where(r => r.Rarity == 5))
+        {
+            db.OutboxMessages.Add(new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                Type = "BroadcastAnnouncement",
+                PayloadJson = JsonSerializer.Serialize(new BroadcastAnnouncementPayload(
+                    "GACHA_5STAR",
+                    $"🌟 {player.Nickname} vừa triệu hồi thành công 5★ {fiveStar.HeroName}!")),
+                OccurredAtUtc = nowUtc
+            });
+        }
 
         // Phát sự kiện nội bộ -> Module Quest tự lắng nghe cộng tiến độ (cùng Transaction!)
         await eventBus.PublishAsync(new GachaSummonedEvent(playerId, banner.Id, request.Count, nowUtc), ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-
-        // Phát loa toàn server qua SignalR cho mỗi tướng 5★ vừa nổ!
-        foreach (var fiveStar in results.Where(r => r.Rarity == 5))
-        {
-            await broadcaster.BroadcastAnnouncementAsync(
-                "GACHA_5STAR",
-                $"🌟 {player.Nickname} vừa triệu hồi thành công 5★ {fiveStar.HeroName}!",
-                ct);
-        }
 
         return new GachaPullResponse(
             banner.Id,

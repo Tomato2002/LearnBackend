@@ -15,7 +15,8 @@ public sealed class JwtTokenGenerator(IOptions<JwtOptions> options)
     public (string Token, DateTime ExpiresAtUtc) GenerateAccessToken(
         Guid userAccountId,
         Guid playerId,
-        string username)
+        string displayIdentity,
+        string role = "Player")
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -25,8 +26,9 @@ public sealed class JwtTokenGenerator(IOptions<JwtOptions> options)
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, userAccountId.ToString()),
-            new Claim(JwtRegisteredClaimNames.UniqueName, username),
+            new Claim(JwtRegisteredClaimNames.UniqueName, displayIdentity),
             new Claim(ClaimsPrincipalExtensions.PlayerIdClaimType, playerId.ToString()),
+            new Claim(ClaimTypes.Role, role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -41,9 +43,6 @@ public sealed class JwtTokenGenerator(IOptions<JwtOptions> options)
         return (new JwtSecurityTokenHandler().WriteToken(token), expiresAtUtc);
     }
 
-    /// <summary>
-    /// Tạo Refresh Token ngẫu nhiên 64 byte (chỉ trả raw token cho client, DB chỉ lưu SHA-256 Hash).
-    /// </summary>
     public (string RawToken, string TokenHash, DateTime ExpiresAtUtc) GenerateRefreshToken()
     {
         var rawBytes = RandomNumberGenerator.GetBytes(64);

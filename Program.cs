@@ -1,15 +1,20 @@
+using LearnBackend.Common.Events;
 using LearnBackend.Common.Middleware;
 using LearnBackend.Hubs;
 using LearnBackend.Infrastructure.DependencyInjection;
 using LearnBackend.Infrastructure.Persistence;
+using LearnBackend.Infrastructure.Security;
+using LearnBackend.Modules.Auth.Entities;
 using LearnBackend.Modules.LiveOps;
 using LearnBackend.Modules.Mail.Entities;
+using LearnBackend.Modules.MasterData;
+using LearnBackend.Modules.Player.Entities;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Nền tảng dùng chung cho MỌI game (DB, JWT, RateLimit, Lock, Idempotency, Redis, SignalR, Auth, Player, Mail)
+// 1. Nền tảng dùng chung cho MỌI game (DB, JWT, RateLimit, Lock, Idempotency, Redis, SignalR, Outbox, Auth, Player, Mail)
 var (usePostgres, useRedis) = builder.Services.AddGamePlatformCore(builder.Configuration);
 
 // 2. Module LiveOps dùng chung cho MỌI game (Bootstrap, Hot Feature Flags, Maintenance, Daily 7-Day & Hourly Bonus)
@@ -28,7 +33,7 @@ app.Logger.LogInformation(
     usePostgres ? "PostgreSQL" : "SQLite (Local)",
     useRedis ? "Redis Distributed (Lock + Idempotency + ZSET + SignalR Backplane)" : "In-Memory (Single Node)");
 
-// Khởi tạo schema DB & seed Global Mail mẫu
+// Khởi tạo schema DB, seed Global Mail mẫu & tài khoản GM (Development)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GameDbContext>();
@@ -39,8 +44,12 @@ using (var scope = app.Services.CreateScope())
         var conn = db.Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Players') WHERE name='WalletVersion';";
-        var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+        cmd.CommandText = """
+            SELECT
+                (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='OutboxMessages') +
+                (SELECT COUNT(*) FROM pragma_table_info('UserAccounts') WHERE name='DeviceId');
+            """;
+        var hasLatestSchema = Convert.ToInt64(cmd.ExecuteScalar()) == 2;
         conn.Close();
 
         if (!hasLatestSchema)
@@ -70,7 +79,7 @@ using (var scope = app.Services.CreateScope())
             {
                 Id = Guid.NewGuid(),
                 Title = "🛠️ Hệ Thống Sẵn Sàng Tái Sử Dụng",
-                Body = "Đã tích hợp LearnBackend.Shared (.NET Standard 2.1 cho Unity), Decoupled Auth Events, Hot Feature Flags & Daily/Hourly Bonus!",
+                Body = "Đã tích hợp Outbox Pattern, Guest DeviceId Login, RBAC Admin và Architecture Tests!",
                 RewardGold = 500,
                 RewardGems = 200,
                 RewardItemId = "potion_exp_small",
@@ -80,9 +89,38 @@ using (var scope = app.Services.CreateScope())
             });
         db.SaveChanges();
     }
+
+    // Seed sẵn tài khoản GameMaster (Role = "Admin") ở môi trường Development để test RBAC ngay
+    if (app.Environment.IsDevelopment() && !db.UserAccounts.Any(u => u.Role == "Admin"))
+    {
+        var hasher = scope.ServiceProvider.GetRequiredService<PasswordHasher>();
+        var masterData = scope.ServiceProvider.GetRequiredService<MasterDataStore>();
+        var eventBus = scope.ServiceProvider.GetRequiredService<IGameEventBus>();
+        var nowUtc = DateTime.UtcNow;
+
+        var adminAccount = new UserAccount
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            NormalizedUsername = "ADMIN",
+            PasswordHash = hasher.Hash("Admin123!"),
+            Role = "Admin",
+            CreatedAtUtc = nowUtc,
+            LastLoginAtUtc = nowUtc
+        };
+        var (adminPlayer, starterLedgers) = PlayerProfile.CreateNew(adminAccount.Id, "GameMaster", masterData.GameRules, nowUtc);
+        db.UserAccounts.Add(adminAccount);
+        db.Players.Add(adminPlayer);
+        db.CurrencyLedgers.AddRange(starterLedgers);
+        eventBus.PublishAsync(new PlayerRegisteredEvent(adminPlayer.Id, nowUtc), CancellationToken.None).GetAwaiter().GetResult();
+        db.SaveChanges();
+
+        app.Logger.LogInformation("👑 Seeded Dev GM Account: username=admin / password=Admin123! (Role=Admin)");
+    }
 }
 
 // 4. HTTP & WebSocket Pipeline (Thứ tự chuẩn Production)
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())

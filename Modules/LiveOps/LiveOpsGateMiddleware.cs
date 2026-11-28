@@ -16,10 +16,12 @@ public sealed class LiveOpsGateMiddleware(RequestDelegate next)
     {
         var path = context.Request.Path.Value ?? string.Empty;
 
-        // Luôn cho phép các cổng quản trị LiveOps, Health Check, Scalar và tài nguyên tĩnh
+        // Luôn cho phép các cổng quản trị LiveOps, đăng nhập GM, Health Check, Scalar và tài nguyên tĩnh
         if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/liveops/bootstrap", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/api/liveops/flags", StringComparison.OrdinalIgnoreCase))
+            path.StartsWith("/api/liveops/flags", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/liveops/admin", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/auth/login", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;

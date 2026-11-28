@@ -133,6 +133,51 @@ Authorization: Bearer {{token}}
 POST {{baseUrl}}/api/liveops/hourly-bonus/claim
 Authorization: Bearer {{token}}
 
+### 25. Chơi Ngay bằng DeviceId (Nakama Guest Login — không cần đăng ký trước)
+# @name guestLogin
+POST {{baseUrl}}/api/auth/guest
+Content-Type: application/json
 
+{
+  "deviceId": "unity-device-iphone16-demo-001",
+  "nickname": "MobileGuest"
+}
 
+@guestToken = {{guestLogin.response.body.data.accessToken}}
 
+### 26. Liên kết tài khoản Guest với Username/Password (giữ nguyên toàn bộ Hero, Vàng, Gems)
+POST {{baseUrl}}/api/auth/link
+Authorization: Bearer {{guestToken}}
+Content-Type: application/json
+
+{
+  "username": "linked_hero01",
+  "password": "Password123!"
+}
+
+### 27. Đăng nhập tài khoản GM / Admin (Dev Seed) để test RBAC [Authorize(Roles = "Admin")]
+# @name gmLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin123!"
+}
+
+@gmToken = {{gmLogin.response.body.data.accessToken}}
+
+### 28. GM phát Thư Đền Bù Toàn Server O(1) (Player thường gọi sẽ bị chặn 403 Forbidden!)
+POST {{baseUrl}}/api/liveops/admin/global-mail
+Authorization: Bearer {{gmToken}}
+Content-Type: application/json
+
+{
+  "title": "🎁 Quà Đền Bù Bảo Trì từ GM",
+  "body": "Cảm ơn các chiến binh đã kiên nhẫn chờ đợi! Nhận ngay 500 Gems & 1000 Gold.",
+  "rewardGold": 1000,
+  "rewardGems": 500,
+  "rewardItemId": "stone_enhance",
+  "rewardItemQty": 3,
+  "expireDays": 14
+}

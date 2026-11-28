@@ -222,7 +222,7 @@
     <section id="authView" class="auth-wrap">
       <div style="text-align:center; margin-bottom:20px;">
         <h1 style="font-size:24px; margin-bottom:4px;">⚔️ Turn-Based RPG Simulator</h1>
-        <p class="muted">Chặng 2: Hero • Inventory • Turn-Based Battle + Lua (MoonSharp)</p>
+        <p class="muted">Modular Monolith • Outbox • Nakama Guest Auth • RBAC • LiveOps</p>
       </div>
       <div class="card">
         <div class="auth-tabs">
@@ -245,7 +245,11 @@
           </div>
           <div class="row" style="margin-top:16px;">
             <button type="submit" class="btn-primary" style="flex:1;" id="authSubmitBtn">Đăng nhập</button>
-            <button type="button" class="btn-ghost" onclick="fillDemo()">Điền mẫu</button>
+            <button type="button" class="btn-ghost" onclick="fillDemo()">Mẫu</button>
+            <button type="button" class="btn-gold" onclick="fillGm()">👑 TK GM</button>
+          </div>
+          <div style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
+            <button type="button" class="btn-emerald" style="width:100%;" onclick="guestLogin()">🎮 Chơi Ngay không cần đăng ký (Guest DeviceId)</button>
           </div>
         </form>
       </div>
@@ -258,7 +262,11 @@
         <div class="brand">
           <div class="avatar" id="hudAvatar">A</div>
           <div>
-            <div class="player-name" id="hudNickname">Loading...</div>
+            <div class="row" style="gap:6px;">
+              <span class="player-name" id="hudNickname">Loading...</span>
+              <span id="hudRoleBadge" class="badge badge-gold hidden">👑 GM</span>
+              <span id="hudGuestBadge" class="badge badge-info hidden">Guest</span>
+            </div>
             <div class="player-lvl" id="hudLevel">Lv. 1 • EXP 0/100</div>
           </div>
         </div>
@@ -274,6 +282,7 @@
             <div class="progress-bar"><div class="progress-fill" id="staminaBar" style="width:100%;"></div></div>
             <div class="stamina-timer" id="hudStaminaTimer">Đã đầy thể lực</div>
           </div>
+          <button id="btnLinkAccount" class="btn-emerald hidden" onclick="linkGuestAccount()">🔗 Liên kết TK</button>
           <button class="btn-ghost" onclick="refreshAll()">🔄 Sync</button>
           <button class="btn-danger" onclick="logout()">Đăng xuất</button>
         </div>
@@ -450,6 +459,9 @@
   <script>
     const TOKEN_KEY = 'rpg_jwt_token';
     const REFRESH_KEY = 'rpg_refresh_token';
+    const ROLE_KEY = 'rpg_user_role';
+    const GUEST_KEY = 'rpg_is_guest';
+    const DEVICE_KEY = 'rpg_device_id';
     let authMode = 'login';
     let masterData = null;
     let currentProfile = null;
@@ -457,6 +469,22 @@
     let myInventory = null;
     let staminaCountdown = 0;
     let countdownInterval = null;
+
+    function updateAuthBadges() {
+      const role = localStorage.getItem(ROLE_KEY) || 'Player';
+      const isGuest = localStorage.getItem(GUEST_KEY) === 'true';
+      document.getElementById('hudRoleBadge').classList.toggle('hidden', role !== 'Admin');
+      document.getElementById('hudGuestBadge').classList.toggle('hidden', !isGuest);
+      document.getElementById('btnLinkAccount').classList.toggle('hidden', !isGuest);
+    }
+
+    function saveAuthSession(res) {
+      localStorage.setItem(TOKEN_KEY, res.accessToken);
+      if (res.refreshToken) localStorage.setItem(REFRESH_KEY, res.refreshToken);
+      localStorage.setItem(ROLE_KEY, res.role || 'Player');
+      localStorage.setItem(GUEST_KEY, String(Boolean(res.isGuest)));
+      updateAuthBadges();
+    }
 
     async function apiFetch(method, path, body = null, requiresAuth = true, customIdempotencyKey = null) {
       const headers = { 'Content-Type': 'application/json' };
@@ -481,7 +509,9 @@
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
       const replayed = res.headers.get('X-Idempotency-Replayed') === 'true';
-      appendLog(method, replayed ? `${path} (REPLAYED)` : path, res.status, ms, data);
+      const corrId = res.headers.get('X-Correlation-Id');
+      const pathTag = `${replayed ? `${path} (REPLAYED)` : path}${corrId ? ` [cid:${corrId.slice(0, 8)}]` : ''}`;
+      appendLog(method, pathTag, res.status, ms, data);
 
       if (res.status === 401 && requiresAuth) {
         // Tự động thử Refresh Token 1 lần trước khi đá ra màn hình đăng nhập
@@ -492,6 +522,11 @@
         showToast('Phiên đăng nhập hết hạn hoặc chưa có token (401).', 'err');
         logout(false);
         throw new Error('UNAUTHORIZED');
+      }
+
+      if (res.status === 403) {
+        showToast('⛔ 403 Forbidden: Tài khoản thường không có quyền Admin/GM! Hãy đăng nhập bằng TK GM (admin / Admin123!).', 'err');
+        throw new Error('FORBIDDEN');
       }
 
       if (!res.ok || (data && typeof data === 'object' && data.success === false)) {
@@ -518,8 +553,7 @@
         const envelope = await res.json();
         const payload = envelope?.data ?? envelope;
         if (!payload?.accessToken) return false;
-        localStorage.setItem(TOKEN_KEY, payload.accessToken);
-        localStorage.setItem(REFRESH_KEY, payload.refreshToken);
+        saveAuthSession(payload);
         return true;
       } catch {
         return false;
@@ -579,6 +613,39 @@
       document.getElementById('inputNickname').value = 'KingArthur';
     }
 
+    function fillGm() {
+      switchAuthMode('login');
+      document.getElementById('inputUsername').value = 'admin';
+      document.getElementById('inputPassword').value = 'Admin123!';
+      showToast('Đã điền tài khoản GM (admin / Admin123!). Bấm Đăng nhập để test quyền Admin!', 'ok');
+    }
+
+    async function guestLogin() {
+      let deviceId = localStorage.getItem(DEVICE_KEY);
+      if (!deviceId) {
+        deviceId = 'web-device-' + (crypto.randomUUID ? crypto.randomUUID().slice(0, 12) : Date.now());
+        localStorage.setItem(DEVICE_KEY, deviceId);
+      }
+      try {
+        const res = await apiFetch('POST', '/api/auth/guest', { deviceId }, false);
+        saveAuthSession(res);
+        showToast(`🎮 Vào game bằng Guest (${res.nickname}) thành công!`, 'ok');
+        await enterGame();
+      } catch { /* handled */ }
+    }
+
+    async function linkGuestAccount() {
+      const username = prompt('Nhập Username mới để liên kết tài khoản Guest (ít nhất 3 ký tự):');
+      if (!username) return;
+      const password = prompt('Nhập Password mới (ít nhất 6 ký tự):');
+      if (!password) return;
+      try {
+        const res = await apiFetch('POST', '/api/auth/link', { username: username.trim(), password });
+        saveAuthSession(res);
+        showToast(`🔗 Liên kết thành công! Từ giờ bạn có thể đăng nhập bằng '${username.trim()}' mà giữ nguyên toàn bộ đồ & tướng!`, 'ok');
+      } catch { /* handled */ }
+    }
+
     async function handleAuthSubmit(e) {
       e.preventDefault();
       const username = document.getElementById('inputUsername').value.trim();
@@ -590,9 +657,8 @@
         const payload = authMode === 'login' ? { username, password } : { username, password, nickname };
         const res = await apiFetch('POST', endpoint, payload, false);
 
-        localStorage.setItem(TOKEN_KEY, res.accessToken);
-        if (res.refreshToken) localStorage.setItem(REFRESH_KEY, res.refreshToken);
-        showToast(`Chào mừng ${res.nickname}!`, 'ok');
+        saveAuthSession(res);
+        showToast(`Chào mừng ${res.nickname}${res.role === 'Admin' ? ' [GM Admin]' : ''}!`, 'ok');
         await enterGame();
       } catch { /* handled */ }
     }
@@ -610,6 +676,8 @@
       }
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(ROLE_KEY);
+      localStorage.removeItem(GUEST_KEY);
       if (countdownInterval) clearInterval(countdownInterval);
       document.getElementById('gameView').classList.add('hidden');
       document.getElementById('authView').classList.remove('hidden');
@@ -618,6 +686,7 @@
 
     // --- Main Data Sync ---
     async function enterGame() {
+      updateAuthBadges();
       document.getElementById('authView').classList.add('hidden');
       document.getElementById('gameView').classList.remove('hidden');
       await refreshAll();
@@ -1427,6 +1496,7 @@
     function renderLiveOpsFlags(bootstrap) {
       const f = bootstrap.featureFlags;
       const card = document.getElementById('liveOpsFlagsCard');
+      const isAdmin = (localStorage.getItem(ROLE_KEY) || 'Player') === 'Admin';
       const items = [
         ['maintenanceMode', '🛑 Bảo Trì Toàn Server'],
         ['enableBattle', '⚔️ Chiến Dịch (Battle)'],
@@ -1437,18 +1507,39 @@
       ];
       card.innerHTML = `
         <div class="row" style="justify-content:space-between; margin-bottom:8px;">
-          <strong>🎛️ GM LiveOps Feature Flags (Tắt/Mở Nóng)</strong>
-          <span class="badge badge-info">v${escapeHtml(bootstrap.masterDataVersion)}</span>
+          <strong>🎛️ GM LiveOps Panel (RBAC Admin)</strong>
+          <span class="badge ${isAdmin ? 'badge-gold' : 'badge-danger'}">${isAdmin ? '👑 Đủ quyền Admin' : '🔒 Chỉ Admin (Player → 403)'}</span>
         </div>
-        <p class="muted" style="font-size:12px; margin-bottom:10px;">Thử tắt <strong>Gacha</strong> rồi sang tab Gacha bấm quay → server chặn ngay <code>503 FEATURE_DISABLED</code> không cần restart!</p>
-        <div class="row" style="gap:8px;">
+        <p class="muted" style="font-size:12px; margin-bottom:10px;">Bảo vệ bởi <code>[Authorize(Roles = "Admin")]</code>. Đăng nhập <code>admin / Admin123!</code> để bật/tắt nóng hoặc phát Thư Đền Bù toàn server!</p>
+        <div class="row" style="gap:8px; margin-bottom:12px;">
           ${items.map(([key, label]) => `
             <button class="${f[key] ? (key === 'maintenanceMode' ? 'btn-danger' : 'btn-emerald') : 'btn-ghost'}"
               style="font-size:12px; padding:6px 10px;"
               onclick="toggleLiveOpsFlag('${key}')">
               ${label}: ${f[key] ? 'BẬT' : 'TẮT'}
             </button>`).join('')}
+        </div>
+        <div style="padding-top:10px; border-top:1px dashed var(--border);">
+          <button class="btn-gold" style="font-size:12px;" onclick="sendGmGlobalMail()">📨 GM Phát Thư Đền Bù Toàn Server (+500💎)</button>
         </div>`;
+    }
+
+    async function sendGmGlobalMail() {
+      const title = prompt('Tiêu đề thư toàn server:', '🎁 Quà Đền Bù Bảo Trì từ GM');
+      if (!title) return;
+      try {
+        await apiFetch('POST', '/api/liveops/admin/global-mail', {
+          title: title.trim(),
+          body: 'Thư quà O(1) do GM phát trực tiếp qua LiveOps Admin API!',
+          rewardGold: 1000,
+          rewardGems: 500,
+          rewardItemId: 'stone_enhance',
+          rewardItemQty: 3,
+          expireDays: 14
+        });
+        showToast('📨 Đã phát Thư Toàn Server! Sang tab Hòm Thư để nhận ngay!', 'ok');
+        await refreshAll();
+      } catch { /* handled */ }
     }
 
     async function toggleLiveOpsFlag(key) {

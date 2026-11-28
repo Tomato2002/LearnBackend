@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text.Json;
 using LearnBackend.Common.Exceptions;
-using LearnBackend.Hubs;
+using LearnBackend.Infrastructure.Outbox;
 using LearnBackend.Infrastructure.Persistence;
 using LearnBackend.Modules.Battle.DTOs;
 using LearnBackend.Modules.Battle.Engine;
@@ -61,8 +62,7 @@ public sealed record AttackGuildBossResponse(
 public sealed class GuildService(
     GameDbContext db,
     MasterDataStore masterData,
-    TurnBasedCombatEngine combatEngine,
-    IGameRealtimeBroadcaster broadcaster)
+    TurnBasedCombatEngine combatEngine)
 {
     private const int BossAttackStaminaCost = 10;
     private const long ParticipationGold = 100;
@@ -261,20 +261,23 @@ public sealed class GuildService(
                 guild.BossMaxHp = 5000 + (guild.BossLevel - 1) * 3500;
                 guild.BossCurrentHp = guild.BossMaxHp;
                 guild.BossName = $"Hắc Long Cổ Đại (Guild Boss Lv.{guild.BossLevel})";
+
+                // Transactional Outbox: lưu sự kiện phát loa trong cùng Transaction với Last Hit
+                db.OutboxMessages.Add(new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    Type = "BroadcastAnnouncement",
+                    PayloadJson = JsonSerializer.Serialize(new BroadcastAnnouncementPayload(
+                        "GUILD_BOSS_KILL",
+                        $"🔥 {player.Nickname} (Bang {guild.Name}) vừa kết liễu {defeatedBossName} và nhận thưởng Last Hit +{bonusGems} Gems!")),
+                    OccurredAtUtc = nowUtc
+                });
             }
 
             try
             {
                 await db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
-
-                if (killedBoss)
-                {
-                    await broadcaster.BroadcastAnnouncementAsync(
-                        "GUILD_BOSS_KILL",
-                        $"🔥 {player.Nickname} (Bang {guild.Name}) vừa kết liễu {defeatedBossName} và nhận thưởng Last Hit +{bonusGems} Gems!",
-                        ct);
-                }
 
                 return new AttackGuildBossResponse(
                     DamageDealt: damageDealt,

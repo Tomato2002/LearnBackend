@@ -1,3 +1,4 @@
+using LearnBackend.Infrastructure.Outbox;
 using LearnBackend.Modules.Arena.Entities;
 using LearnBackend.Modules.Auth.Entities;
 using LearnBackend.Modules.Gacha.Entities;
@@ -36,9 +37,10 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<Guild> Guilds => Set<Guild>();
     public DbSet<GuildMember> GuildMembers => Set<GuildMember>();
 
-    // Stage 5 LiveOps Retention Tables
+    // Stage 5 LiveOps Retention & Transactional Outbox Tables
     public DbSet<PlayerDailyBonus> PlayerDailyBonuses => Set<PlayerDailyBonus>();
     public DbSet<PlayerHourlyBonus> PlayerHourlyBonuses => Set<PlayerHourlyBonus>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,10 +49,22 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
         modelBuilder.Entity<UserAccount>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Username).HasMaxLength(32).IsRequired();
-            entity.Property(x => x.NormalizedUsername).HasMaxLength(32).IsRequired();
-            entity.Property(x => x.PasswordHash).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Username).HasMaxLength(32);
+            entity.Property(x => x.NormalizedUsername).HasMaxLength(32);
+            entity.Property(x => x.PasswordHash).HasMaxLength(256);
+            entity.Property(x => x.DeviceId).HasMaxLength(128);
+            entity.Property(x => x.Role).HasMaxLength(16).IsRequired();
             entity.HasIndex(x => x.NormalizedUsername).IsUnique();
+            entity.HasIndex(x => x.DeviceId).IsUnique();
+        });
+
+        modelBuilder.Entity<OutboxMessage>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PayloadJson).IsRequired();
+            entity.Property(x => x.LastError).HasMaxLength(256);
+            entity.HasIndex(x => new { x.ProcessedAtUtc, x.OccurredAtUtc });
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>
